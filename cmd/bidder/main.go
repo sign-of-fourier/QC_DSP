@@ -1,19 +1,22 @@
+// cmd/bidder/main.go - production bidder
 package main
-// running the prod server
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
 
-	"github.com/yourname/openrtb-framework/internal/config"
-	"github.com/yourname/openrtb-framework/internal/core"
-	"github.com/yourname/openrtb-framework/internal/runtime"
+	"github.com/yourname/qc-dsp/internal/config"
+	"github.com/yourname/qc-dsp/internal/core"
+	"github.com/yourname/qc-dsp/internal/logging"
+	"github.com/yourname/qc-dsp/internal/runtime"
 )
 
 func main() {
 	cfg := config.Load()
 
-	// Simple in-memory campaign store (you’d implement this)
+	// Simple campaign store for now
 	store := core.NewInMemoryCampaignStore(map[string]core.CampaignState{
 		cfg.DefaultCampaignID: {
 			ID:          cfg.DefaultCampaignID,
@@ -28,14 +31,23 @@ func main() {
 	engine := core.NewEngine(strategy, store)
 	metrics := core.NewMetrics()
 
-	server := runtime.NewGoogleRTBServer(engine, metrics, cfg.SeatID, cfg.DefaultCampaignID)
+	ctx := context.Background()
+	firehoseLogger := logging.NewFirehoseLogger(ctx)
+
+	server := runtime.NewGoogleRTBServer(
+		engine,
+		metrics,
+		firehoseLogger,
+		cfg.SeatID,
+		cfg.DefaultCampaignID,
+	)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/openrtb", server.Handler)
 
 	addr := ":" + cfg.Port
-	log.Printf("Starting Google OpenRTB bidder on %s seat=%s campaign=%s",
-		addr, cfg.SeatID, cfg.DefaultCampaignID)
+	log.Printf("Starting bidder on %s, seat=%s, firehose=%s",
+		addr, cfg.SeatID, os.Getenv("FIREHOSE_STREAM_NAME"))
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("server error: %v", err)
