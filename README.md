@@ -1,7 +1,7 @@
 # Quante Carlo's DCO Engine
 Optimizes Ads in real-time.
 More clicks in fewer experiements
-<img src="AdLearning2.drawio.png"></img>
+<img src="AdLearning.png"></img>
 
 ## Ad studio
 Create ad templates, components and possible values for each component
