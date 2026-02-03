@@ -18,13 +18,15 @@ the parameters include a user, campaign, segment, template combination
 
 
 `/ad_server?user_id=<user_id>&campaign_id=<campaign_id>&segment_id=<segment_id>&template_id=<template_id>&credentials=<credentials>`
+<br>
 After auction is won, RTB provides this url to SSP
 
 `/decision_api?user_id=<user_id>&campaign_id=<campaign_id>&segment_id=<segment_id>&template_id=<template_id>&credentials=<credentials>`
+<br>
 This is embedded in the script tag in the ad template
 
 
-## template library
+## Template Library
 Right now, just a directory of files
 template_library/user_id/campaign_id/template_id.template 
 
