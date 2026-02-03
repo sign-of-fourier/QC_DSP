@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="ad.size" content="width=300,height=250" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dynamic Ad (fetch)</title>
+  <style>
+    html, body { margin:0; padding:0; width:300px; height:250px; overflow:hidden; }
+    #ad { position:relative; width:300px; height:250px; font-family:system-ui, Arial; color:#fff; cursor:pointer; }
+    #content { position:absolute; inset:14px; display:flex; flex-direction:column; gap:10px; }
+    #headline { font-size:20px; font-weight:800; line-height:1.1; }
+    #subhead { font-size:13px; opacity:.92; max-width:240px; line-height:1.25; }
+    #cta { margin-top:auto; align-self:flex-start; background:rgba(255,255,255,.92); color:#111; padding:10px 12px; border-radius:10px; font-weight:800; font-size:13px; }
+    #badge { position:absolute; top:10px; right:10px; font-size:11px; background:rgba(0,0,0,.35); padding:6px 8px; border-radius:999px; }
+  </style>
+</head>
+<body>
+  <div id="ad" role="button" tabindex="0" aria-label="Open advertiser site">
+    <div id="content">
+      <div id="headline">Loading…</div>
+      <div id="subhead"></div>
+      <div id="cta"></div>
+    </div>
+    <div id="badge"></div>
+  </div>
+
+  <script>
+    // 1) Decide which variant/params to request (often from query params your ad server adds).
+    const template = new URL(window.location.href).searchParams.get("template") || "t";
+
+    // 2) Build a request URL with query params using URLSearchParams (avoids manual string concat). [web:19]
+    const params = new URLSearchParams({ template });
+    params.append("campaign", new URL(window.location.href).searchParams.get("campaign") || "c")
+    params.append("segment", new URL(window.location.href).searchParams.get("segment") || "s")
+    
+    
+    // 3) Fetch the config JSON, then render.
+    // Must be served via HTTP(S); for cross-origin, server must send proper CORS headers. [web:27]
+    const configUrl = `http://ec2-18-223-196-212.us-east-2.compute.amazonaws.com:8000/ad_server?${params}`;
+    let clickUrl = 'https://example.com'
+    function render(cfg, ad_id) {
+      const ad = document.getElementById("ad");
+      ad.style.background = cfg.bg || "#2563eb";
+
+      document.getElementById("headline").textContent = cfg.headline || "Default headline";
+      document.getElementById("subhead").textContent = cfg.description || "";
+      document.getElementById("cta").textContent = cfg.cta || "Learn more";
+      document.getElementById("badge").textContent = `Variant ${cfg.price || "?"}`;
+      document.getElementById("content").style.backgroundImage = `url( ${cfg.image})` || 'blank';
+
+      clickUrl = `http://ec2-18-223-196-212.us-east-2.compute.amazonaws.com:8000/click_counter?ad_id=${ad_id}`;
+    }
+
+    async function load() {
+      try {
+        const res = await fetch(configUrl, { cache: "no-store" });
+        if (!res.ok) throw new Error(`Config HTTP ${res.status}`);
+        const json = await res.json();
+        // Allow either {variant, headline,...} or {variants:{a:{...}}}
+        //const cfg = json.variants ? (json.variants[variant] || json.default || {}) : json;
+        console.log(json)
+	render(json.component_values, json.ad_id);
+      } catch (e) {
+        // Render a safe fallback if fetch fails.
+	console.log(e)
+        render({bg:"#111827", headline:"Offer available now.", subhead:"Tap to learn more.", cta:"Open", clickUrl });
+      }
+    }
+
+    function openClick() {
+      window.open(clickUrl, "_blank", "noopener");
+    }
+
+    document.getElementById("ad").addEventListener("click", openClick);
+    document.getElementById("ad").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") openClick();
+    });
+
+    load();
+  </script>
+</body>
+</html>
+
