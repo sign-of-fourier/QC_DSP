@@ -13,3 +13,5 @@ Create ad templates, components and possible values for each component
 - GPR: optimization of ads based on semantic content
 - Massively scalable batch Expected Imprtovement
 - Warping function
+
+(More Details)[data.md]
