@@ -21,7 +21,7 @@ import requests
 #from scipy.stats import ecdf, lognorm
 #from multiprocessing import Pool
 #from scipy.stats import norm
-
+import db
 
 app = Flask(__name__, static_folder='data')
 
@@ -30,11 +30,22 @@ def quante_carlo():
     return "<html>Quante Carlo</html>"
 
 def get_component_values(campaign_id, template_id, segment_id):
-    return {'component_values': {'headline': 'Wool Socks',
-                                 'description': 'Describe This!',
-                                 'cta': 'buy now', 'price': 'Free',
-                                 'image': 'https://www.nasa.gov/wp-content/uploads/2026/02/moon.jpg?resize=300,200'},
-            'ad_id': '100-100-100-50'}
+    template = db.templates().get(template_id)
+    campaign = db.campaigns().get(campaign_id, template_id)
+    ad_id = random.choice(campaign[0]['segments'][segment_id])
+    #print(template)
+    #print(campaign)
+    V = {'headline': 'Wool Socks',
+         'description': 'Describe This!',
+         'cta': 'buy now', 'price': 'Free',
+         'image': 'https://www.nasa.gov/wp-content/uploads/2026/02/moon.jpg?resize=300,200'}
+
+    for c, t in zip(ad_id.split('-'), template):
+        #print(c, t['component_id'], c)
+        V[t['component_id']] = t['possible_values'][c]
+        #print(c, t['component_id'], t['possible_values'][c])
+    return {'ad_id': ad_id,
+            'component_values': V}
 
 @app.route('/favicon.ico')
 def favicon():
@@ -48,26 +59,68 @@ def test():
 
 
 
+url_stem = 'http://3.15.22.204:8000'
 
-@app.route("/ad_server")
-def ad_server():
+
+
+@app.route("/template")
+def serve_dynamic_ad():
 
     campaign = request.args.get('campaign')
     template = request.args.get('template')
-    segment = request.args.get('segment', None)
+    customer = request.args.get('customer', None)
+    with open(f'ad_library/{customer}/{campaign}/{template}') as f:
+        return f.read().format(url_stem, url_stem)
+
+
+@app.route("/ad_server/<page>")
+def ad_server(page):
     
-    component_values = get_component_values(campaign, template, segment)
-    print(component_values['component_values']['image'])
-    return component_values
+    campaign = request.args.get('campaign')
+    template = request.args.get('template')
+    segment = request.args.get('segment', None)
+    if page == 'click_counter':
+        ad_id = request.args.get('ad_id')
+        print(template, campaign, segment, ad_id)
+        print (db.clicks().update(campaign, template, ad_id, segment))
+        return redirect('https://quantecarlo.com')
+    elif page == 'dco':
+
+        component_values = get_component_values(campaign, template, segment)
+        return component_values
+    else:
+        return f"no match for {page}"
 
 
 
-@app.route("/click_counter")
-def click_counter():
 
-    ad_id = request.args.get('ad_id')
-    print(ad_id)
-    return redirect('https://quantecarlo.com')
+
+
+@app.route("/ad_inventory")
+def add_inventory():
+    campaign = 'test7'
+    page = """<html>
+<h2>ad inventory</h2>
+<table border=1>
+    <tr>
+        <td> Campaign </td> <td> Segment </td> <td> Template </td>
+    </tr>
+"""
+    for segment, template in zip(
+            ['news_general', 'fashion_trendy'],
+            ['T_X1', 'T_X2']
+            ):
+        page += f"""<tr>
+  <td>{campaign}</td>
+  <td>{segment}</td>
+  <td><a href=\"{url_stem}/template?customer=test&campaign={campaign}&&template={template}&segment={segment}\">{template}</a>
+  </td>
+</tr>
+"""
+    return page + '</table>'
+
+
+
 
 
 
