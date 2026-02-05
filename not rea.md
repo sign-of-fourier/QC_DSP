@@ -75,45 +75,29 @@ Add an **empirical calibration layer**:
 **Long-term research direction:**
 Implement multivariate GPR with learned cross-ad kernels that capture cannibalization structure directly. This is theoretically cleaner but much harder to implement and requires more data.
 
+You're not claiming to perfectly model cannibalization (no one can without tons of data), but you're **hedging against it** in a principled way that competitors aren't.
+<span style="display:none">[^10][^11][^12][^13][^14][^15][^16][^17][^18][^19][^2][^20][^3][^4][^5][^6][^7][^8][^9]</span>
+
 <div align="center">⁂</div>
 
 [^1]: http://proceedings.mlr.press/v32/gopalan14.pdf
-
 [^2]: https://pixis.ai/blog/8-ways-to-avoid-ad-cannibalization-in-paid-media-campaigns/
-
 [^3]: https://www.reddit.com/r/PPC/comments/7yo9cf/quantifying_cannibalization_of_organic_traffic/
-
 [^4]: https://www.topsort.com/post/how-to-solve-the-problem-of-ad-cannibalization-in-retail-media
-
 [^5]: https://www.moburst.com/blog/what-is-cannibalization-in-aso/
-
 [^6]: https://searchengineland.com/prevent-ppc-cannibalizing-seo-efforts-451920
-
 [^7]: https://www.practicalecommerce.com/understanding-google-ads-new-conversion-action-sets
-
 [^8]: http://math.iit.edu/~mdixon7/multivariate-gaussian-process_DC.pdf
-
 [^9]: https://www.branch.io/resources/blog/apple-search-ads-strategies-for-managing-cannibalization-and-competition/
-
 [^10]: https://www.reddit.com/r/FacebookAds/comments/xk0p6c/do_ad_sets_within_same_campaign_affect_the/
-
 [^11]: https://arxiv.org/html/2212.01048v2
-
 [^12]: https://en.wikipedia.org/wiki/Multi-armed_bandit
-
 [^13]: https://deeprlcourse.github.io/recitations/week6/
-
 [^14]: https://arxiv.org/html/2505.13355v2
-
 [^15]: https://www.economics.uci.edu/files/docs/micro/s11/Scott.pdf
-
 [^16]: https://naomi.princeton.edu/wp-content/uploads/sites/744/2021/03/Allerton2013ol.pdf
-
 [^17]: http://papers.neurips.cc/paper/7179-action-centered-contextual-bandits.pdf
-
 [^18]: https://www.sciencedirect.com/science/article/abs/pii/S0377221724007203
-
 [^19]: https://www.countbayesie.com/blog/2020/9/26/learn-thompson-sampling-by-building-an-ad-auction
-
 [^20]: http://proceedings.mlr.press/v39/chou14.pdf
 
