@@ -1,8 +1,5 @@
-<img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
-
-# Actually, at the higher (ad set) level, is not really BO. You're using the acquisition function PI which happens to be exceedance and you're using the ad embeddings and GPR. It is almost BO but it's really the probability that any ad converts. The difference is, this eliminates "canabalization" however, the true objective function should be "total conversions" so, really it pushes ads to be more orthogonal in the ad embedding space. The question is, if total conversions is additive then why is it not E[conversions of ad1] + E[conversions from ad2] + ... etc.  in which case, PI would not be appropriate. The canabalization effect is confusing.
-
-You're hitting on a fundamental modeling question that doesn't have clean coverage in the literature because **cannibalization breaks the i.i.d. assumption** that most bandit/BO theory relies on.
+# Ad Science
+## Using Ad Set Optimization
 
 ## The Core Problem
 
