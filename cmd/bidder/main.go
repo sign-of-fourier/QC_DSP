@@ -1,4 +1,4 @@
-// cmd/bidder/main.go - production bidder
+// cmd/bidder/main.go
 package main
 
 import (
@@ -7,47 +7,32 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/yourname/qc-dsp/internal/config"
-	"github.com/yourname/qc-dsp/internal/core"
-	"github.com/yourname/qc-dsp/internal/logging"
-	"github.com/yourname/qc-dsp/internal/runtime"
+	"github.com/sign-of-fourier/QC_DSP/internal/logging"
+	"github.com/sign-of-fourier/QC_DSP/internal/runtime"
 )
 
 func main() {
-	cfg := config.Load()
-
-	// Simple campaign store for now
-	store := core.NewInMemoryCampaignStore(map[string]core.CampaignState{
-		cfg.DefaultCampaignID: {
-			ID:          cfg.DefaultCampaignID,
-			DailyBudget: 100.0,
-			TotalBudget: 1000.0,
-			IsActive:    true,
-			TargetCPA:   20.0,
-		},
-	})
-
-	strategy := core.NewSimpleValueStrategy()
-	engine := core.NewEngine(strategy, store)
-	metrics := core.NewMetrics()
+	port := os.Getenv("BIDDER_PORT")
+	if port == "" {
+		port = "8080"
+	}
+	seatID := os.Getenv("BIDDER_SEAT_ID")
+	if seatID == "" {
+		seatID = "test-seat"
+	}
 
 	ctx := context.Background()
 	firehoseLogger := logging.NewFirehoseLogger(ctx)
 
-	server := runtime.NewGoogleRTBServer(
-		engine,
-		metrics,
-		firehoseLogger,
-		cfg.SeatID,
-		cfg.DefaultCampaignID,
-	)
+	server := runtime.NewGoogleRTBServer(firehoseLogger, seatID)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/openrtb", server.Handler)
+	mux.HandleFunc("/test-log", server.TestLogHandler)
 
-	addr := ":" + cfg.Port
+	addr := ":" + port
 	log.Printf("Starting bidder on %s, seat=%s, firehose=%s",
-		addr, cfg.SeatID, os.Getenv("FIREHOSE_STREAM_NAME"))
+		addr, seatID, os.Getenv("FIREHOSE_STREAM_NAME"))
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("server error: %v", err)

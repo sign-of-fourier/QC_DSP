@@ -2,50 +2,31 @@
 package runtime
 
 import (
-	"context"
 	"io"
 	"log"
 	"net/http"
-	"time"
 
-	"github.com/yourname/qc-dsp/internal/core"
-	"github.com/yourname/qc-dsp/internal/logging"
-
-	pb "github.com/yourname/qc-dsp/proto/openrtb"
+	"github.com/sign-of-fourier/QC_DSP/internal/logging"
+	pb "github.com/sign-of-fourier/QC_DSP/proto"
 	"google.golang.org/protobuf/proto"
 )
 
 type GoogleRTBServer struct {
-	engine        *core.Engine
-	metrics       *core.Metrics
-	firehose      *logging.FirehoseLogger
-	seatID        string
-	defaultCampID string
+	firehose *logging.FirehoseLogger
+	seatID   string
 }
 
-func NewGoogleRTBServer(
-	engine *core.Engine,
-	metrics *core.Metrics,
-	firehose *logging.FirehoseLogger,
-	seatID string,
-	defaultCampaignID string,
-) *GoogleRTBServer {
+func NewGoogleRTBServer(fh *logging.FirehoseLogger, seatID string) *GoogleRTBServer {
 	return &GoogleRTBServer{
-		engine:        engine,
-		metrics:       metrics,
-		firehose:      firehose,
-		seatID:        seatID,
-		defaultCampID: defaultCampaignID,
+		firehose: fh,
+		seatID:   seatID,
 	}
 }
 
+// Handler: main OpenRTB endpoint for Google Authorized Buyers
 func (s *GoogleRTBServer) Handler(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
-	s.metrics.IncAuctions()
-
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		s.metrics.IncErrors()
 		return
 	}
 
@@ -53,7 +34,6 @@ func (s *GoogleRTBServer) Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("read body error: %v", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
-		s.metrics.IncErrors()
 		return
 	}
 	defer r.Body.Close()
@@ -62,66 +42,57 @@ func (s *GoogleRTBServer) Handler(w http.ResponseWriter, r *http.Request) {
 	if err := proto.Unmarshal(body, req); err != nil {
 		log.Printf("unmarshal BidRequest error: %v", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
-		s.metrics.IncErrors()
 		return
 	}
 
 	if len(req.GetImp()) == 0 {
+		// No impressions – just no-bid
 		w.WriteHeader(http.StatusNoContent)
-		s.metrics.ObserveLatency(time.Since(start))
 		return
 	}
-
 	imp := req.GetImp()[0]
 
-	// Build and send log record to Firehose
-	logRec := s.buildBidRequestLog(req, imp, start)
+	// Build log record
+	logRec := s.buildBidRequestLog(req, imp)
 	partitionKey := req.GetId()
 	s.firehose.Log(r.Context(), partitionKey, logRec)
 
-	// Normal bidding flow
-	ac := s.toAuctionContext(req, imp)
-	dec, err := s.engine.EvaluateAuction(r.Context(), s.defaultCampID, ac)
-	if err != nil {
-		log.Printf("engine error: %v", err)
-		s.metrics.IncErrors()
-		w.WriteHeader(http.StatusNoContent)
-		s.metrics.ObserveLatency(time.Since(start))
-		return
-	}
-	if !dec.ShouldBid {
-		w.WriteHeader(http.StatusNoContent)
-		s.metrics.ObserveLatency(time.Since(start))
-		return
-	}
-	s.metrics.IncBids()
+	// For now, always no-bid (204)
+	w.WriteHeader(http.StatusNoContent)
+}
 
-	resp := s.buildBidResponse(req, imp, dec)
-	out, err := proto.Marshal(resp)
-	if err != nil {
-		log.Printf("marshal BidResponse error: %v", err)
-		s.metrics.IncErrors()
-		w.WriteHeader(http.StatusNoContent)
-		s.metrics.ObserveLatency(time.Since(start))
+// Optional debug endpoint to test Firehose without real RTB
+func (s *GoogleRTBServer) TestLogHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	rec := logging.NewBidRequestLog()
+	rec.AuctionID = "test-auction-id"
+	rec.SeatID = s.seatID
+	rec.Imp.ID = "1"
+	rec.Imp.Format = "banner"
+	rec.Imp.Width = 300
+	rec.Imp.Height = 250
+	rec.Imp.FloorCPM = 1.23
+	rec.Device.OS = "iOS"
+	rec.Device.DeviceType = "mobile"
+	rec.Geo = "US-MA"
+	rec.Site.Domain = "example.com"
+	rec.Site.ID = "site-123"
+	rec.User.ID = "user-abc"
+	rec.User.BuyerUID = "buyeruid-xyz"
+
+	s.firehose.Log(r.Context(), rec.AuctionID, rec)
+
 	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(out); err != nil {
-		log.Printf("write response error: %v", err)
-		s.metrics.IncErrors()
-	}
-
-	elapsed := time.Since(start)
-	s.metrics.ObserveLatency(elapsed)
-	log.Printf("auction=%s bid=%.4f latency=%s", req.GetId(), dec.BidCPM, elapsed)
+	_, _ = w.Write([]byte("test log sent to Firehose\n"))
 }
 
 func (s *GoogleRTBServer) buildBidRequestLog(
 	req *pb.BidRequest,
 	imp *pb.BidRequest_Imp,
-	now time.Time,
 ) logging.BidRequestLog {
 	rec := logging.NewBidRequestLog()
 	rec.AuctionID = req.GetId()

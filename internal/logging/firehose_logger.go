@@ -13,37 +13,33 @@ import (
 )
 
 type FirehoseLogger struct {
-	client         *firehose.Client
-	streamName     string
-	async          bool
-	partitionField string
+	client     *firehose.Client
+	streamName string
+	async      bool
 }
 
-// NewFirehoseLogger creates a logger that sends JSON to a Firehose delivery stream.
-// Env var: FIREHOSE_STREAM_NAME
 func NewFirehoseLogger(ctx context.Context) *FirehoseLogger {
 	streamName := os.Getenv("FIREHOSE_STREAM_NAME")
 	if streamName == "" {
-		log.Println("FirehoseLogger: FIREHOSE_STREAM_NAME not set, logger disabled")
+		log.Println("FirehoseLogger: FIREHOSE_STREAM_NAME not set; logger disabled")
 		return nil
 	}
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		log.Printf("FirehoseLogger: failed to load AWS config: %v, logger disabled", err)
+		log.Printf("FirehoseLogger: failed to load AWS config: %v; logger disabled", err)
 		return nil
 	}
 
 	client := firehose.NewFromConfig(cfg)
+
 	return &FirehoseLogger{
 		client:     client,
 		streamName: streamName,
-		async:      true, // send in goroutine to not block bidding
+		async:      true,
 	}
 }
 
-// Log encodes payload to JSON and sends to Firehose.
-// partitionKey is optional; Firehose can ignore it for direct-put streams, but we set something for consistency.
 func (fl *FirehoseLogger) Log(ctx context.Context, partitionKey string, payload any) {
 	if fl == nil {
 		return
@@ -55,7 +51,7 @@ func (fl *FirehoseLogger) Log(ctx context.Context, partitionKey string, payload 
 		return
 	}
 
-	record := &firehose.PutRecordInput{
+	input := &firehose.PutRecordInput{
 		DeliveryStreamName: &fl.streamName,
 		Record: &types.Record{
 			Data: data,
@@ -63,9 +59,9 @@ func (fl *FirehoseLogger) Log(ctx context.Context, partitionKey string, payload 
 	}
 
 	if fl.async {
-		go fl.putRecord(context.Background(), record)
+		go fl.putRecord(context.Background(), input)
 	} else {
-		fl.putRecord(ctx, record)
+		fl.putRecord(ctx, input)
 	}
 }
 

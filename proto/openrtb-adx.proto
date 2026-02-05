@@ -1,0 +1,1879 @@
+// Protocol version: v.203
+import "openrtb.proto";
+option java_outer_classname = "AdxExt";
+package com.google.doubleclick;
+
+// Protocol buffer for Ad Exchange OpenRTB specification.
+message ImpExt {
+  // The eligible billing IDs to which a billable impression can be attributed.
+  // A billing ID for attributing an impression resulting from a winning bid can
+  // be specified in `BidResponse.seatbid.bid.ext.billing_id`. These billing IDs
+  // can represent the bidder's matching pretargeting configurations, the
+  // bidder's deal billing ID, or eligible child seats.
+  // [AdX: BidRequest.AdSlot.MatchingAdData.billing_id]
+  repeated int64 billing_id = 1;
+
+  // [AdX: BidRequest.publisher_settings_list_id]
+  // [AdX: BidRequest.AdSlot.publisher_settings_list_id]
+  repeated fixed64 publisher_settings_list_id = 2;
+
+  // [AdX: BidRequest.AdSlot.allowed_vendor_type]
+  repeated int32 allowed_vendor_type = 3 [packed = true];
+
+  // A creative that is disallowed to bid on this impression due to Ad
+  // Exchange policies or creative disapproval, excluded creative attributes,
+  // excluded product or sensitive categories, allowed vendor types,
+  // restricted categories or languages applicable to the bid request.
+  message ExcludedCreative {
+    // Buyer creative ID of the disallowed creative.
+    optional string buyer_creative_id = 1;
+  }
+
+  // Creatives that are disallowed for the impression. Submitting a bid with
+  // one of the creatives in this list will result in such bid being filtered
+  // before the auction. Contact your account manager if you would like
+  // to enable this feature.
+  repeated ExcludedCreative excluded_creatives = 10;
+
+  // [AdX: BidRequest.AdSlot.dfp_ad_unit_code]
+  optional string dfp_ad_unit_code = 6;
+
+  // Deprecated. This will be removed after January 16, 2026. Use the standard
+  // field BidRequest.imp.rwdd instead.
+  // [AdX: BidRequest.AdSlot.is_rewarded]
+  optional bool is_rewarded_inventory = 7 [deprecated = true];
+
+  // Possible requirement types for AMP ads.
+  enum AmpAdRequirementType {
+    // AMP ad requirements unknown.
+    UNKNOWN_AMP_AD_REQUIREMENT_TYPE = 1;
+
+    // AMP ads are not allowed.
+    AMP_AD_NOT_ALLOWED = 2;
+
+    // Either AMP ads or non-AMP ads are allowed;
+    // AMP ads are not early rendered.
+    AMP_AD_ALLOWED_AND_NOT_EARLY_RENDERED = 3;
+
+    // Either AMP ads or non-AMP ads are allowed;
+    // AMP ads are early rendered.
+    AMP_AD_ALLOWED_AND_EARLY_RENDERED = 4;
+
+    // AMP ads are required.
+    // Ads that are non-AMP may be rejected by the publisher.
+    AMP_AD_REQUIRED = 5;
+  }
+  optional AmpAdRequirementType ampad = 8 [default =
+    UNKNOWN_AMP_AD_REQUIREMENT_TYPE];
+
+  // Secure signals passed by the publisher.
+  message BuyerGeneratedRequestData {
+    // The source (provider) of the signal.
+    oneof source {
+      SourceApp source_app = 1;
+    }
+
+    // The source of the signal when this request is from an app.
+    message SourceApp {
+      // Identifier for the SDK that generated this data. It will match the id
+      // in BidRequest.app.ext.installed_sdk.id.
+      optional string id = 1;
+    }
+
+    // The secure signal.
+    optional string data = 2;
+  }
+  repeated BuyerGeneratedRequestData buyer_generated_request_data = 9;
+
+  // Deprecated. This will be removed in Q1 2024. This field has been
+  // deprecated in favor of the repeated field
+  // `billable_event_rate_bid_adjustment` below.
+  // For ads rendered using a custom SDK only: multiplier applied to bid in
+  // the auction. The adjustment reflects the likelihood that your bid would
+  // generate a billable event (meaning the ad renders successfully) if it
+  // won the auction, relative to the probability that other bids generate a
+  // billable event if they won the auction. This adjustment can be larger or
+  // smaller than 1. This affects the final ranking in the auction only; in
+  // particular, this multiplier does not affect the payment.
+  optional double billable_event_rate_adjustment = 16 [deprecated = true,
+    default = 1];
+
+  // The billable event rate bid adjustment of an ad and the dependent
+  // features of the ad the adjustment applies to, such as the format or the
+  // SDK used to render the ad. Each feature combination may have a unique
+  // adjustment, each adjustment therefore specifies which SDK or creative
+  // format it applies to.
+  message BillableEventRateBidAdjustment {
+    // A multiplier to your bid to adjust for the likelihood that your bid
+    // would result in a billable event (namely, the ad renders successfully)
+    // if it won the auction, relative to the average probability that bids
+    // from other buyers would result in a billable event if they won the
+    // auction. This adjustment can be larger or smaller than 1. This affects
+    // the final ranking in the auction only; in particular, this multiplier
+    // does not affect the payment or whether the bid clears any floor price.
+    optional float bid_adjustment = 1 [default = 1];
+
+    // The types of creative the bid adjustments can apply to.
+    enum CreativeType {
+      CREATIVE_TYPE_UNKNOWN = 0;
+
+      // Banner ads
+      HTML_SNIPPET = 1;
+
+      // VAST video or audio ads
+      VIDEO_VAST = 2;
+
+      // Native ads
+      NATIVE = 3;
+
+      // SDK rendered ad
+      SDK_RENDERED = 4;
+    }
+
+    // The type of ads to which the above bid adjustment applies to. Each type
+    // corresponds to different ways of how the ad's creative is specified, as
+    // described in
+    // https://developers.google.com/authorized-buyers/rtb/response-guide#specify-creative.
+    // If the ad is SDK-rendered, this will be set to SDK_RENDERED regardless
+    // of the actual creative type.
+    optional CreativeType creative_type = 2 [default = CREATIVE_TYPE_UNKNOWN];
+
+    // The SDK used to render the ad with. The SDK ID will match the one sent
+    // in BidRequest.app.ext.installed_sdk.id. This field is not set for Google
+    // SDK.
+    optional AppExt.InstalledSdk sdk = 3;
+  }
+
+  // A list of billable event rate bid adjustments applicable to the request
+  // and the ad features associated to the adjustment. Bid adjustments are
+  // listed here only if they are not equal to 1.0, which is equivalent to
+  // having no adjustment. This field replaces the deprecated field
+  // billable_event_rate_adjustment.
+  repeated BillableEventRateBidAdjustment billable_event_rate_bid_adjustment =
+    65;
+
+  // Parameters related to Open Bidding.
+  message OpenBidding {
+    // This field is set to true if the publisher set up a yield group or a
+    // mediation group that targets this adslot and this bidder. See
+    // https://support.google.com/admanager/answer/7128453 for information on
+    // Open Bidding and its effects on the bidding process.
+    optional bool is_open_bidding = 2;
+  }
+  optional OpenBidding open_bidding = 12;
+
+  // The allowed restricted ad categories. See
+  // https://storage.googleapis.com/adx-rtb-dictionaries/ad-restricted-categories.txt
+  // for a list of ids. If you bid with an ad in a restricted category, you MUST
+  // ALWAYS declare the category in the bid response regardless of the values in
+  // this field.
+  repeated int32 allowed_restricted_category = 13;
+
+  // Publisher's SKAdNetwork information to support app installation
+  // attribution for iOS 14 and later. Apple's SKAdNetwork API helps
+  // advertisers measure ad-driven app installation by sending a postback
+  // to the ad network after a successful install. Publishers will need
+  // to configure supported ad networks in their app's property list
+  // (Info.plist) to allow an install to be attributed to the ad impression.
+  // For more info visit:
+  // https://developer.apple.com/documentation/storekit/skadnetwork
+  message SKAdNetworkRequest {
+    // List of all SKAdNetwork versions supported by the request, depending on
+    // the OS version and the SDK version.
+    repeated string versions = 4;
+
+    // ID of publisher app in Apple's App Store.
+    optional string sourceapp = 2;
+
+    // SKAdNetworkIdentifier entries in the publisher app's Info.plist.
+    repeated string skadnetids = 3;
+
+    // List of fidelity types supported, depending on the SKAdNetwork API
+    // version supported by the operating system and SDK as well as ad slot
+    // properties.
+    repeated SKAdNetworkFidelityType fidelities = 5 [packed = true];
+
+    // Indicates if this request supports SKOverlay.
+    optional bool skoverlay = 6;
+  }
+
+  // [AdX: BidRequest.Mobile.skadn]
+  optional SKAdNetworkRequest skadn = 14;
+
+  // Indicates the creative policy and publisher blocks that applies to this
+  // request.
+  message CreativeEnforcementSettings {
+    // Creative policy enforcement level that applies to this request.
+    // Creatives that don't adhere to the specified policy will be filtered
+    // before the auction. The status of the creatives with their respective
+    // policies can be retrieved through Creative API.
+    // https://developers.google.com/authorized-buyers/apis/guides/rtb-api/creatives
+    // Bids on deals may override the policy enforcement applicable to the
+    // request.
+    enum PolicyEnforcement {
+      POLICY_ENFORCEMENT_UNKNOWN = 0;
+
+      // Baseline policy for all ads serving through any of Google's ads
+      // platform products. Learn more at:
+      // https://support.google.com/platformspolicy/answer/3013851.
+      // The status of the creatives with platform policies can be found at
+      // the platformPolicyCompliance field through the Creative API.
+      POLICY_ENFORCEMENT_PLATFORM_POLICY = 1;
+
+      // Policy for ads serving through Google's ad network. This includes the
+      // baseline policy for all ads serving through any of Google's ads
+      // platform products. Learn more at:
+      // https://support.google.com/authorizedbuyers/answer/1325008.
+      // The status of the creatives with platform policies can be found at
+      // the platformPolicyCompliance field through the Creative API.
+      POLICY_ENFORCEMENT_NETWORK_AND_PLATFORM_POLICY = 2;
+    }
+    optional PolicyEnforcement policy_enforcement = 1;
+
+    // Creative publisher blocks enforcement level that applies to this
+    // request. Publisher blocks allow publishers to control which creatives
+    // can be shown on their properties.
+    // Deals may also override publisher blocks. Refer to
+    // Deals.ext.publisher_blocks_overridden field.
+    enum PublisherBlocksEnforcement {
+      PUBLISHER_BLOCKS_ENFORCEMENT_UNKNOWN = 0;
+
+      // The publisher's blocking controls are enforced on creatives
+      // submitted. Publisher blocks enforcement settings are provided in the
+      // following fields:
+      // - Imp.ext.publisher_settings_list_id
+      // - bcat
+      // - Imp.ext.allowed_restricted_category
+      // - Imp.ext.allowed_vendor_type
+      // - Audio.battr
+      // - Video.battr
+      // - Banner.battr
+      // - Native.battr
+      PUBLISHER_BLOCKS_ENFORCEMENT_APPLIES = 1;
+
+      // The publisher's blocking controls are not enforced on creatives
+      // submitted.
+      PUBLISHER_BLOCKS_ENFORCEMENT_OVERRIDDEN = 2;
+    }
+    optional PublisherBlocksEnforcement publisher_blocks_enforcement = 3;
+  }
+  optional CreativeEnforcementSettings creative_enforcement_settings = 15;
+
+  // Describes the environment where the ad auction is run.
+  enum AuctionEnvironment {
+    // The auction determining the winning ad is held server-side.
+    SERVER_SIDE_AUCTION = 0;
+
+    // The contextual auction that determines a winning contextual bid is held
+    // server-side, and bidding functions are run on the device to determine
+    // interest group bids. Both the winning contextual bid and interest
+    // group bids are entered into a final auction held on the device to
+    // select the winning ad. For more information regarding the Protected
+    // Audience API on device bidding and auction, see:
+    // https://github.com/WICG/turtledove and
+    // https://github.com/WICG/turtledove/blob/main/FLEDGE.md
+    ON_DEVICE_INTEREST_GROUP_AUCTION = 1;
+  }
+
+  // Deprecated. This field will be removed in January, 2026.
+  // Specifies where the ad auction runs.
+  optional AuctionEnvironment auction_environment = 18 [deprecated = true,
+    default = SERVER_SIDE_AUCTION];
+
+  // Deprecated. This field will be removed in January, 2026.
+  // The supported auction environment for this impression. For inventory
+  // which does not support interest group bidding, this will always be set to
+  // SERVER_SIDE_AUCTION. For inventory which does support interest group
+  // bidding, this will be set to ON_DEVICE_INTEREST_GROUP_AUCTION. Note that
+  // this only indicates that the interest group auction is supported, not
+  // that it is guaranteed to execute. If no buyer chooses to participate in
+  // the interest group auction, then the interest group auction will be
+  // skipped and the winner of the contextual auction, if any, will be
+  // served instead.
+  optional AuctionEnvironment ae = 66 [deprecated = true, default =
+    SERVER_SIDE_AUCTION];
+
+  // Indicates whether a mobile app bid request is for an app open ad.
+  // See App open ad guidance at
+  // https://support.google.com/admob/answer/9341964 for more information.
+  // [AdX: BidRequest.Mobile.is_app_open_ad]
+  optional bool is_app_open_ad = 19;
+
+  // AdUnitMapping is used to identify publisher inventory units in the
+  // bidder's namespace. The mappings are only populated when
+  // the bidder works directly with a publisher, and provides the mapping
+  // from Google's ad unit namespace to the bidder's inventory namespace.
+  // The ad unit mapping is only applicable for requests that use a custom
+  // SDK. https://support.google.com/admanager/answer/9601810.
+  message AdUnitMapping {
+    // Key-value pair used to specify the inventory unit in the bidder's
+    // namespace.
+    message Keyval {
+      // The key is the name of the bidder's inventory unit identifier for the
+      // SDK.
+      optional string key = 1;
+
+      // The value of the bidder's inventory unit identifier for the given
+      // format.
+      optional string value = 2;
+    }
+
+    // Multiple key-value pairs can be specified in order to support
+    // bidders whose inventory unit space is hierarchical and has multiple
+    // identifiers. The key-value pairs for the chosen AdUnitMapping should be
+    // sent back in the bid response as
+    // BidResponse.seatbid.bid.ext.sdk_rendered_ad.sdk_params. This is passed to
+    // the bidder's SDK.
+    repeated Keyval keyvals = 1;
+
+    // Possible ad unit formats that can be used for the mapping. Corresponds
+    // to the adapter that will be used on the SDK.
+    enum FormatType {
+      FORMAT_UNKNOWN = 0;
+
+      // Display banner ads for web or mobile apps. For example, a 320x50
+      // leaderboard slot. This includes out-stream video.
+      FORMAT_BANNER = 1;
+
+      // A full-screen ad to be displayed inside a mobile app.
+      FORMAT_INTERSTITIAL = 2;
+
+      // Custom display or video ads for web or mobile apps that match the
+      // user experience of the site or app in which theyâ€™re placed.
+      FORMAT_NATIVE = 3;
+
+      // Video ads that appear before, during, or after video content
+      // streams.
+      FORMAT_VIDEO_VAST = 4;
+
+      // Video ads for mobile apps that allow users to voluntarily watch an
+      // ad in exchange for an in-app reward.
+      FORMAT_REWARDED = 5;
+
+      // Interstitial ads that allow users to watch an ad in exchange for
+      // an in-app reward. Does not require opt-in.
+      // https://support.google.com/admanager/answer/7386053
+      FORMAT_REWARDED_INTERSTITIAL = 6;
+
+      // App open ads shows at app load screens. App open ads can be closed
+      // at any time, and are designed to be shown when the users bring the
+      // app to the foreground.
+      FORMAT_APP_OPEN = 7;
+    }
+
+    // The mappings are targeted through a format, which is expressed in the
+    // Google-defined taxonomy. Format is populated in the bid request since
+    // Google supports targeting multiple formats with a single ad
+    // unit, and Google's definition of the format may not match the bidder's
+    // definition. In order for the bidder to differentiate which format
+    // matched, it is sent in the bid request.
+    optional FormatType format = 2;
+  }
+
+  // Ad unit mappings that match the given adslot.
+  repeated AdUnitMapping ad_unit_mapping = 64;
+
+  // Global placement ID (GPID) is a distinct, persistent ID, specified by the
+  // publisher, which is consistent across supply paths for each ad unit on a
+  // page. See
+  // https://github.com/InteractiveAdvertisingBureau/openrtb/blob/main/extensions/community_extensions/gpid.md.
+  // If you are interested in receiving GPID, contact your account manager.
+  optional string gpid = 67;
+
+  // The version of the JavaScript library used by the Mobile Ads SDK to
+  // serve the ad. Only set for mobile app inventory.
+  optional string jsver = 68;
+
+  // Whether this request enables ad experiences that drive user engagement for
+  // mobile app interstitial and rewarded ads. Examples of such experiences
+  // include increasing the required viewing time, requiring more steps to close
+  // the ads, adding the required viewing time for endcards, or showing a
+  // Google-generated endcard after the ads. See
+  // https://support.google.com/admob/answer/15525707 for more information.
+  optional bool highengagement = 70;
+
+  // Possible placements of the ad in an over-the-top streaming request.
+  // See
+  // https://support.google.com/admanager/answer/10678356?#ott_placement&zippy=%2Csee-a-clickable-alphabetical-index-of-all-parameters%2Cott-placement-ott-placement
+  enum OttPlacement {
+    OTT_PLACEMENT_UNKNOWN = 0;
+
+    // Out-stream format that appears using an overlay on top of video content
+    // when a user pauses content playback.
+    OTT_PLACEMENT_PAUSE = 1;
+
+    // Ad that appears on the homescreen of a CTV device or OTT app. This
+    // includes masthead, banner, and tile implementations on a homescreen.
+    OTT_PLACEMENT_HOMESCREEN = 2;
+
+    // In-stream video ad played in a separate ad video player beside video
+    // content. Typically requires squeezing back video content and loading a
+    // second video player.
+    OTT_PLACEMENT_PICTURE_IN_PICTURE = 3;
+
+    // In-stream banner ad that involves squeezing back video content and
+    // creating an ad around the video. Typically, but not limited to, an
+    // L-shaped ad content box.
+    OTT_PLACEMENT_L_BANNER = 4;
+
+    // Any in-stream ad format that appears on top of video content but does not
+    // take up the full screen. Can be a display or video ad.
+    OTT_PLACEMENT_OVERLAY = 5;
+
+    // Any over-the-top placement that isn't one of the above.
+    OTT_PLACEMENT_CUSTOM = 99;
+  }
+
+  // The placement of the ad in an over-the-top streaming request.
+  optional OttPlacement ottplacement = 71;
+}
+
+message AppExt {
+  // Identification of and information about an SDK installed in the
+  // publisher's app that the bidder has access to, often because it's the
+  // bidder's SDK.
+  message InstalledSdk {
+    // Identifier for the installed SDK.
+    optional string id = 1;
+
+    // Semantic version of the installed SDK and the adapter that communicates
+    // between the installed SDK and Google's SDK.
+    message Version {
+      optional int32 major = 1 [default = -1];
+      optional int32 minor = 2 [default = -1];
+      optional int32 micro = 3 [default = -1];
+    }
+
+    // The version of the installed SDK.
+    optional Version sdk_version = 2;
+
+    // The version of the adapter that communicates with the installed SDK.
+    optional Version adapter_version = 3;
+  }
+  repeated InstalledSdk installed_sdk = 1;
+
+  // The domain of the partner (of the site/app owner) with ownership of some
+  // portion of ad inventory on the site/app. The partner's ads.txt or
+  // app-ads.txt file will be hosted here. More detail at
+  // http://iabtechlab.com/wp-content/uploads/2021/03/ctv-app-ads-explainer-guide.pdf
+  optional string inventorypartnerdomain = 2;
+}
+
+message BannerExt {
+  // Describes collapsible banner inventory
+  // (https://support.google.com/admanager/answer/14002717).
+  //
+  // A buyer can bid into a collapsible banner slot with either a
+  // traditional banner ad or a collapsible banner ad. A traditional banner
+  // ad needs to match one of the allowed sizes specified in
+  // BidRequest.imp.banner.format.{w, h}.
+  //
+  // A collapsible banner ad needs to support two sized layouts, one for
+  // collapsed state, one for expanded state. The final ad experience
+  // is rendered by Google, including a collapse/expand button. The ad always
+  // starts in the expanded state and can be collapsed by the user afterwards.
+  // Specify BidResponse.seatbid.bid.ext.clpad when returning
+  // a collapsible banner ad in the response.
+  message CollapsibleAdSlot {
+    // Maximum width of the collapsible banner ad in device independent
+    // pixels (DIPS). If a collapsible creative in the response has a greater
+    // width in the expanded state, it will be filtered before the auction.
+    optional int32 wmax = 1;
+
+    // Maximum height of the collapsible banner ad in device independent
+    // pixels (DIPS). If a collapsible creative in the response has a greater
+    // height in the expanded state, it will be filtered before the auction.
+    optional int32 hmax = 2;
+  }
+
+  // Contains information about a banner ad slot's collapsibility,
+  // if supported, and is unset otherwise.
+  optional CollapsibleAdSlot clpadslot = 1;
+
+  // Indicates the acceptable ad width and height ranges for impressions which
+  // support flexible ad sizes.
+  message FlexSlot {
+    // The minimum acceptable ad width in device-independent pixels (DIPS).
+    optional int32 wmin = 1;
+
+    // The maximum acceptable ad width in device-independent pixels (DIPS).
+    optional int32 wmax = 2;
+
+    // The minimum acceptable ad height in device-independent pixels (DIPS).
+    optional int32 hmin = 3;
+
+    // The maximum acceptable ad height in device-independent pixels (DIPS).
+    optional int32 hmax = 4;
+  }
+
+  // This field contains information about a banner impression's flexible ad
+  // size ranges, if supported, and is unset otherwise.
+  optional FlexSlot flexslot = 2;
+}
+
+message BidResponseExt {
+  // [AdX: BidResponse.processing_time_ms]
+  optional int32 processing_time_ms = 1;
+}
+
+message BidExt {
+  // [AdX: BidResponse.Ad.impression_tracking_url]
+  repeated string impression_tracking_url = 1;
+
+  // [AdX: BidResponse.Ad.ad_choices_destination_url]
+  optional string ad_choices_destination_url = 2;
+
+  // The URLs to call when the user clicks on the ad. Currently supported only
+  // for Programmatic Guaranteed deals with publisher-managed creatives, where
+  // these click trackers will be sent to the bidder server to server. For more
+  // information on publisher-managed creatives, see
+  // https://support.google.com/admanager/answer/9243220.
+  // [AdX: BidResponse.Ad.click_tracking_urls]
+  repeated string click_tracking_urls = 22;
+
+  // [AdX: BidResponse.Ad.AdSlot.exchange_deal_type]
+  enum ExchangeDealType {
+    OPEN_AUCTION = 0;
+    PRIVATE_AUCTION = 1;
+    PREFERRED_DEAL = 2;
+    EXCHANGE_AUCTION_PACKAGE = 3;
+  }
+  optional ExchangeDealType exchange_deal_type = 4 [default = OPEN_AUCTION];
+
+  // [AdX: BidResponse.Ad.attribute]
+  // See buyer-declarable-creative-attributes.txt in the technical documentation
+  // for a list of ids. Note that not all declarable attributes come through in
+  // the BidRequest in the various `battr` fields.
+  repeated int32 attribute = 5 [packed = true];
+
+  // The URL to fetch an AMPHTML ad. Only one of the following should be set:
+  // html_snippet, video_url, amp_ad_url, native_ad.
+  optional string amp_ad_url = 6;
+
+  // An ad that will be rendered by an SDK known to the buyer. This can only
+  // be used when the BidRequest included a
+  // BidRequest.app.ext.installed_sdk submessage.
+  message SdkRenderedAd {
+    // The identifier for the SDK that will render the ad. Must match a
+    // BidRequest.app.ext.installed_sdk.id sent in the corresponding bid
+    // request.
+    optional string id = 1;
+
+    // Data to pass to the SDK in order to render the ad. This data is opaque
+    // to the publisher and to Google.
+    optional string rendering_data = 2;
+
+    // Declared ad assets to support creative scanning, classification, and
+    // enforcement of ad policy and publisher blocks for ads rendered with a
+    // custom SDK.
+    message DeclaredAd {
+      // Ad content used by SDK to render ad.
+      oneof content {
+        // The HTML snippet representative of the SDK-rendered ad.
+        string html_snippet = 1;
+
+        // The URL to the VAST asset used in the SDK-rendered ad.
+        string video_url = 2;
+
+        // The VAST document used to render custom SDK-rendered ad. This
+        // document should conform to the VAST 2.0 or 3.0 standard.
+        string video_vast_xml = 4;
+
+        // The content of a native ad. Native ads consist of multiple building
+        // blocks (such as image and text), which are rendered by the buyer SDK.
+        // This field is only required for creative scanning. The assets you
+        // include don't need to match assets specified in a native request
+        // object (if any) in the bid request. NativeResponse.assets.id is
+        // optional and doesn't need to match an asset on the native request
+        // object. NativeResponse.assets.img.type is required.
+        .com.google.openrtb.NativeResponse native_response = 5;
+      }
+
+      // The final landing pages of the SDK-rendered ad.
+      repeated string click_through_url = 3;
+    }
+    optional DeclaredAd declared_ad = 6;
+  }
+  optional SdkRenderedAd sdk_rendered_ad = 7;
+
+  message EventNotificationToken {
+    // The content of the token, which will be ignored if longer than 128
+    // bytes.
+    optional string payload = 1;
+  }
+
+  // A token set by bidders for troubleshooting which will be included in the
+  // real-time feedback for the Bid it is sent in. The contents of the token
+  // will not be logged.
+  optional EventNotificationToken event_notification_token = 8;
+
+  // All restricted categories for the ads that may be shown from this snippet.
+  // See ad-restricted-categories.txt in the technical documentation for a list
+  // of ids. If you are bidding with ads in restricted categories, you must
+  // always declare them here.
+  repeated int32 restricted_category = 9;
+
+  // The billing ID to attribute this impression to. The value must be in the
+  // repeated BidRequest.imp.ext.billing_id field sent for this impression.
+  // If the length of BidRequest.imp.ext.billing_id is exactly 1
+  // and the bidder does not have any active child seats, this field
+  // is not required and its contents will be ignored.
+  optional int64 billing_id = 10;
+
+  // Token used to identify end third party buyer information if an
+  // exchange as an open bidder is an intermediary. This is obtained from the
+  // third party buyer and must be passed to Google unaltered in the bid
+  // response.
+  optional string third_party_buyer_token = 14;
+
+  // Buyer declared ID which will be used to break down cost transparency
+  // metrics in Reporting. Note that IDs with fewer than 1000 impressions will
+  // not be used to break down metrics. IDs longer than 64 bytes will be
+  // ignored.
+  optional string buyer_reporting_id = 17;
+
+  // Experimental feature; may be subject to change. See
+  // https://support.google.com/authorizedbuyers/answer/10890762 for more
+  // information.
+  //
+  // Specifies frequency capping to be applied to the bid. Impressions for each
+  // user are capped at the level specified by fcap_id. A bid will not
+  // participate in the auction if an additional impression for the user would
+  // violate any of the specified caps. Multiple frequency caps can be specified
+  // for the same fcap_id.
+  //
+  // A bid is filtered before the auction if the frequency cap is malformed.
+  // Instances where the cap is malformed include:
+  //  - fcap_id is empty or is very long
+  //  - max_mpressions or time_range are non-positive
+  //  - there are a large number of frequency caps for a single bid
+  //  - time_unit is not specified
+  //
+  // Note that if a subsequent bid with the same fcap_id uses a different
+  // duration (represented by time_unit and time_range) then impressions counted
+  // against the old frequency cap will not count against the new one and vice
+  // versa.
+  message FrequencyCap {
+    // An ID that can represent a bidder's use-case for frequency capping; for
+    // example, it could represent their campaign, ad, line item, or some
+    // other entity. It should not contain any user-specific information or
+    // identifiers and should not be longer than 64 characters.
+    optional string fcap_id = 1;
+
+    // The time units for which frequency caps can be enforced.
+    enum TimeUnit {
+      UNKNOWN_TIME_UNIT = 0;
+      MINUTE = 1;
+      DAY = 2;
+      WEEK = 3;
+      MONTH = 4;
+
+      // When INDEFINITE is used, time_range will be ignored. INDEFINITE means
+      // the frequency cap will be applied for a long period of time, (longer
+      // than a month) but not necessarily forever.
+      INDEFINITE = 5;
+    }
+
+    // The unit of time used to specify the time window for which a frequency
+    // cap applies.
+    optional TimeUnit time_unit = 2;
+
+    // The length of the time window, in units specified by time_unit, for which
+    // the frequency cap applies. For instance, if time_unit=WEEK and
+    // time_range=3, then capping is applied for a three week period. If the
+    // time_unit=INDEFINITE, this will be ignored.
+    optional int32 time_range = 3 [default = 1];
+
+    // The maximum number of impressions allowed to be shown to a user for
+    // the provided frequency_cap_id within the time window described by
+    // time_unit and time_range.
+    optional int32 max_imp = 4;
+  }
+  repeated FrequencyCap fcap = 18;
+
+  // Advertiser's SKAdNetwork information to support app installation
+  // attribution for iOS 14 and later. Apple's SKAdNetwork API helps
+  // advertisers measure ad-driven app installation by sending a postback
+  // to the ad network after a successful install. Ad networks will need
+  // to send their network ID and signed advertiser information to allow
+  // an install to be attributed to the ad impression.
+  // For more info visit:
+  // https://developer.apple.com/documentation/storekit/skadnetwork
+  message SKAdNetworkResponse {
+    // Version of SKAdNetwork supported by the advertiser. Also used to
+    // specify how the signature was generated by the advertiser. This
+    // should match the version from BidRequest.imp.ext.skad.version.
+    optional string version = 1;
+
+    // Ad network identifier used in signature. This should match one of the
+    // items in BidRequest.imp.ext.skad.skadnetids.
+    optional string network = 2;
+
+    // Campaign ID compatible with Apple's spec. Used in SKAdNetwork 3.0 and
+    // below. Replaced by Source Identifier (`sourceidentifier` field) in
+    // SKAdNetwork 4.0 and above.
+    optional string campaign = 3;
+
+    // A four-digit integer that ad networks define to represent the ad
+    // campaign. Used in SKAdNetwork 4.0+ and replaces the `campaign` field.
+    optional string sourceidentifier = 11;
+
+    // ID of advertiser's app in Apple's app store.
+    optional string itunesitem = 4;
+
+    // ID of custom product page to display (for iOS 15 or later).
+    // If not specified, default product page will be displayed.
+    // See https://developer.apple.com/app-store/custom-product-pages/
+    // for more details about custom product pages.
+    optional string productpageid = 12;
+
+    // SKAdNetwork API starting from version 2.2 supports multiple ad
+    // presentation options specified by the `fidelity-type` parameter of the
+    // SKAdNetwork signature. This holds parameters used to generate the
+    // signature that would be different for each fidelity type supported.
+    // For more info visit:
+    // https://developer.apple.com/documentation/storekit/skadnetwork/signing_and_providing_ads
+    message Fidelity {
+      // The fidelity type of the attribution to track.
+      optional SKAdNetworkFidelityType fidelity = 1 [default =
+        STOREKIT_RENDERED_ADS];
+
+      // A unique all-lowercase UUID generated by the advertiser to use for
+      // generating the signature.
+      optional string nonce = 2;
+
+      // Unix time in millis used at the time of signature generation.
+      optional string timestamp = 3;
+
+      // SKAdNetwork signature as specified by Apple.
+      optional string signature = 4;
+    }
+    repeated Fidelity fidelities = 9;
+
+    // A unique all-lowercase UUID generated by the advertiser to use for
+    // generating the signature.
+    // Note:  This field will be deprecated in favor of the
+    // BidResponse.bid.ext.skadn.fidelities.nonce field to support multiple
+    // fidelity types.
+    optional string nonce = 5;
+
+    // ID of publisher's app in Apple's app store. This should match the ID
+    // from BidRequest.imp.ext.skad.sourceapp.
+    optional string sourceapp = 6;
+
+    // Unix time in millis used at the time of signature generation.
+    // Note:  This field will be deprecated in favor of the
+    // BidResponse.bid.ext.skadn.fidelities.timestamp field to support multiple
+    // fidelity types.
+    optional string timestamp = 7;
+
+    // SKAdNetwork signature as specified by Apple.
+    // Note:  This field will be deprecated in favor of the
+    // BidResponse.bid.ext.skadn.fidelities.signature field to support multiple
+    // fidelity types.
+    optional string signature = 8;
+
+    // These options indicate how to present SKOverlay recommending the
+    // advertised app.
+    // Supported by iOS 14 and later.
+    //
+    // For more info visit:
+    // https://developer.apple.com/documentation/storekit/skoverlay
+    message SKOverlay {
+      // Delay in seconds after the ad begins before presenting the overlay.
+      // If this field is set to 0, the overlay will be shown immediately
+      // after the ad begins. If this field is unset, the overlay will not
+      // be shown for the ad.
+      optional int32 delay = 1;
+
+      // Delay in seconds after the endcard shows before presenting the
+      // overlay. (This field only applies to rewarded or interstitial video
+      // creatives.) If this field is set to 0, the overlay will be shown
+      // immediately after the endcard shows. If this field is unset,
+      // the overlay will not be shown for the endcard.
+      // If both `delay` and `endcarddelay` are set, the overlay will be
+      // automatically dismissed when the ad ends, and shown again after
+      // the endcard shows.
+      optional int32 endcarddelay = 2;
+
+      // Whether this overlay can be dismissed by the user.
+      optional bool dismissible = 3 [default = true];
+    }
+    optional SKOverlay skoverlay = 13;
+  }
+
+  // [AdX: BidResponse.Ad.skadn]
+  optional SKAdNetworkResponse skadn = 19;
+
+  // Possible types of app promotion.
+  enum AppPromotionType {
+    UNKNOWN_APP_PROMOTION_TYPE = 0;
+
+    // For encouraging new users to download and install the advertised app.
+    // Clicking this ad will show the app store listing as an overlay (for
+    // supported formats), without leaving the publisher app.
+    // Click through URL for this ad points to the app store listing.
+    INSTALLS = 1;
+
+    // For re-engaging existing users who have installed the advertised app.
+    // Click through URL for this ad points to the installed app directly.
+    ENGAGEMENT = 2;
+
+    // Other types of app promotion that do not fall into the categories
+    // above. No features specific to app promotion types will apply.
+    OTHER = 3;
+  }
+
+  // [AdX: BidResponse.Ad.app_promotion_type]
+  // Type of the app promotion corresponding to the advertised app specified
+  // in the seatbid.bid.bundle field.
+  // If the advertised app is not specified, this field will be ignored.
+  //
+  // Setting BidResponse.seatbid.bid.bundle field without this field will be
+  // treated as if this field were set to OTHER.
+  optional AppPromotionType app_promotion_type = 28;
+
+  // All bids with the same bid_group_id will be won or lost as a group.
+  // Bids must have a non-empty bid_group_id to allow an ad to be played
+  // as part of a pod.
+  // This field is currently only supported for rewarded video pods requests.
+  // Note that if there are multiple bids for the same ad, each bid must have
+  // different bid_group_id. For example, if a bidder wants to bid creative_1
+  // for first position and last position in the pod and creative_2 for any
+  // position and want to ensure either both win at the same time or neither
+  // of those wins, bidder needs to submit:
+  // {
+  //   "seatbid": [
+  //     {
+  //       "bid": [
+  //         {
+  //           "crid": "creative_1",
+  //           "slotinpod": 1,
+  //           "ext": {
+  //             "bid_group_id": "group1"
+  //           }
+  //         },
+  //         {
+  //           "crid": "creative_1",
+  //           "slotinpod": -1,
+  //           "ext": {
+  //             "bid_group_id": "group2"
+  //           }
+  //         },
+  //         {
+  //           "crid": "creative_2",
+  //           "slotinpod": 0,
+  //           "ext": {
+  //             "bid_group_id": "group1"
+  //           }
+  //         },
+  //         {
+  //           "crid": "creative_2",
+  //           "slotinpod": 0,
+  //           "ext": {
+  //             "bid_group_id": "group2"
+  //           }
+  //         }
+  //       ]
+  //     }
+  //   ]
+  // }
+  optional string bid_group_id = 26;
+
+  // The Digital Services Act (DSA) transparency declarations. See
+  // https://support.google.com/admanager/answer/14335032.
+  message Dsa {
+    // Free text string describing the name of the advertiser on whose behalf
+    // the ad is shown. Bids will not be accepted if this value is longer
+    // than 100 characters.
+    optional string behalf = 1;
+
+    // Free text string describing the advertiser who paid for the ad. Must
+    // always be included even if it's the same as what is listed in the
+    // displayed_on_behalf attribute. Bids will not be accepted if this value
+    // is longer than 100 characters.
+    optional string paid = 2;
+
+    // Indicates that the buyer will render their own DSA transparency
+    // information inside the creative.
+    optional bool adrender = 3;
+  }
+
+  // DSA Ad Transparency information provided by the buyer.
+  optional Dsa dsa = 30;
+
+  // Collapsible banner ad information. In collapsible banner format, the
+  // ad will start in an expanded state and can be manually collapsed by
+  // the user. To learn more about collapsible banner ads, see:
+  // https://support.google.com/admanager/answer/14002717?hl=en.
+  message CollapsibleAd {
+    // Width of the creative in the expanded state in device independent
+    // pixels (DIPS). The width of the creative in the collapsed state
+    // is represented by BidResponse.seatbid.bid.w. If wexp is greater
+    // than BidRequest.imp.banner.ext.clpadslot.wmax, the ad will be
+    // filtered before the auction.
+    optional int32 wexp = 1;
+
+    // Height of the creative in the expanded state in device independent
+    // pixels (DIPS). The height of the creative in the collapsed state
+    // is represented by BidResponse.seatbid.bid.h. If hexp is greater than
+    // BidRequest.imp.banner.ext.clpadslot.hmax, the ad will be filtered before
+    // the auction.
+    optional int32 hexp = 2;
+  }
+
+  // If bidding on a collapsible banner ad slot
+  // (see: BidRequest.imp.banner.ext.clpadslot), you may populate this
+  // if you want to place a bid with a collapsible banner ad. If not set,
+  // the bid will be rendered as a traditional banner ad.
+  optional CollapsibleAd clpad = 31;
+
+  // The URLs that the user could be directed to when clicking on this ad. Do
+  // not include URLs for intermediate calls to an ad server that are unrelated
+  // to the final landing page. All bids must declare either a click URL using
+  // this field, the advertiser domain in the `BidResponse.seatbid.bid.adomain`
+  // field, or both. We recommend that bidders use this field, possibly in
+  // addition to `BidResponse.seatbid.bid.adomain`, for more accurate
+  // enforcement of publisher and user protections, for instance so that your
+  // bid is not incorrectly filtered.
+  // This field maps to BidResponse.ad.click_through_url.
+  repeated string clickurl = 32;
+
+  // This optional field must be a URL if populated. Google pings this URL if
+  // a user clicks on the ad, but the deeplink provided in the click through URL
+  // fails to launch the target app specified in
+  // `BidResponse.seatbid.bid.bundle`. This field is only used when
+  // `app_promotion_type` is `ENGAGEMENT`.
+  optional string engagementclickfailureurl = 35;
+}
+
+message NativeRequestExt {
+  // [AdX: BidRequest.AdSlot.native_ad_template[0].style_id]
+  optional int32 style_id = 1;
+
+  // [AdX: BidRequest.AdSlot.native_ad_template[0].style_height]
+  optional int32 style_height = 2;
+
+  // [AdX: BidRequest.AdSlot.native_ad_template[0].style_width]
+  optional int32 style_width = 3;
+
+  // [AdX: BidRequest.AdSlot.native_ad_template[0].style_layout_type]
+  enum LayoutType {
+    PIXEL = 0;
+    FLUID = 1;
+  }
+  optional LayoutType style_layout_type = 4 [default = PIXEL];
+
+  // Ad position on screen.
+  optional .com.google.openrtb.AdPosition pos = 6;
+}
+
+message EventTrackerExt {
+  // Parameters associated with the resource that will be passed to the
+  // resource when it is loaded. The format of the parameters is dependent
+  // on the script vendor.
+  optional string verification_parameters = 2;
+
+  // Used to uniquely identify the verification script provider.
+  optional string vendorKey = 3;
+}
+
+message PublisherExt {
+  // The billing address country code of the publisher. This may be different
+  // from the hosting country of the website. For a complete list of country
+  // codes, refer to
+  // https://developers.google.com/adwords/api/docs/appendix/codes-formats#country-codes
+  optional string country = 1;
+
+  // The ID of the host publisher. When populated, indicates that the host
+  // publisher participated in revenue sharing, and the ID can be used to
+  // authorize ads.txt.
+  optional string host_publisher_id = 2;
+
+  // If true, the bidder is responsible for paying the publisher directly for
+  // this impression.
+  optional bool directpay = 3;
+}
+
+message SiteExt {
+  enum AmpPage {
+    // This is not an AMP page.
+    DIALECT_HTML = 0;
+
+    // This is an Amp page.
+    DIALECT_HTML_AMP = 1;
+  }
+
+  // Whether this is an AMP page or not. Omitted if unknown.
+  optional AmpPage amp = 1;
+  enum VisibilityState {
+    VISIBILITY_STATE_UNKNOWN = 0;
+
+    // The page is at least partially visible. For example, in the foreground
+    // tab of a non-minimized window.
+    VISIBILITY_STATE_VISIBLE = 1;
+
+    // The page is not visible to users. For example, when the page is in a
+    // background browser tab, or in a minimized window.
+    VISIBILITY_STATE_HIDDEN = 2;
+  }
+
+  // The visibility state of the web page containing the ad slot.
+  // See https://www.w3.org/TR/page-visibility/.
+  // [AdX: BidRequest.page_visibility]
+  optional VisibilityState page_visibility = 2 [default =
+    VISIBILITY_STATE_UNKNOWN];
+
+  // Information about a browser window's user activation state. See
+  // https://html.spec.whatwg.org/multipage/interaction.html#the-useractivation-interface.
+  message UserActivation {
+    // Indicates whether a user has completed an interaction since page load.
+    optional bool wasact = 1;
+
+    // Indicates whether a user is currently interacting with the page.
+    optional bool isact = 2;
+  }
+
+  // User activation information from the browser for the current request, if
+  // the request is for a web page.
+  optional UserActivation uact = 5;
+
+  // The set of possible web navigation types that predicate a page load. Each
+  // of these types may have different performance characteristics. For example,
+  // users going back and forth might experience a faster site than users
+  // performing navigation for the first time or submitting forms. See
+  // https://w3c.github.io/navigation-timing/#dom-performancenavigationtiming-type.
+  enum NavigationType {
+    NAVIGATION_TYPE_UNKNOWN = 0;
+
+    // Navigation started by clicking a link, entering the URL in the browser's
+    // address bar, form submission, or initializing through a script operation
+    // other than reload and back_forward.
+    NAVIGATION_TYPE_NAVIGATE = 1;
+
+    // Navigation is through the browser's reload operation, location.reload(),
+    // or a Refresh pragma directive like
+    // <meta http-equiv="refresh" content="300">.
+    NAVIGATION_TYPE_RELOAD = 2;
+
+    // Navigation is through the browser's history traversal operation.
+    NAVIGATION_TYPE_BACK_FORWARD = 3;
+
+    // Navigation is initiated by a prerender hint (deprecated). See
+    // https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel/prerender.
+    NAVIGATION_TYPE_PRERENDER = 4;
+  }
+
+  // The type of browser navigation that led to the current page. Unset for
+  // non-web ad requests.
+  optional NavigationType ntype = 6;
+
+  // Indicates that the request is using semi-transparent branding,
+  // which means only a truncated version of the request URL will
+  // be provided. This decision is made by the publisher, see
+  // https://support.google.com/admanager/answer/4584891#urls for context.
+  optional bool is_semi_transparent_request = 3;
+
+  // The domain of the partner (of the site owner) with ownership
+  // of some portion of ad inventory on the site. The partner's ads.txt file
+  // will be hosted here. More detail at
+  // http://iabtechlab.com/wp-content/uploads/2021/03/ctv-app-ads-explainer-guide.pdf
+  optional string inventorypartnerdomain = 4;
+}
+
+message BidRequestExt {
+  // Feedback on bids submitted in previous responses. This is only set if
+  // real-time feedback is enabled for your bidder. Contact your
+  // account manager if you want to enable real-time feedback.
+  message BidFeedback {
+    // The unique id from BidRequest.id.
+    optional string request_id = 1;
+
+    // The status code for the ad. See creative-status-codes.txt in the
+    // technical documentation for a list of ids.
+    optional int32 creative_status_code = 2;
+
+    // Deprecated. This field is not populated and will be removed after March,
+    // 2025. If the bid won the auction, this is the price paid in your account
+    // currency. If the bid participated in the auction but was out-bid, this
+    // is the CPM that should have been exceeded in order to win. This is not
+    // set if the bid was filtered prior to the auction, if the publisher or
+    // winning bidder has opted out of price feedback or if your account has
+    // opted out of sharing winning prices with other bidders. For first-price
+    // auctions, minimum_bid_to_win is populated instead of this field.
+    optional double price = 3 [deprecated = true];
+
+    // The minimum bid value necessary to have won the auction, in your account
+    // currency. If your bid won the auction, this is the second highest bid
+    // that was not filtered (including the floor price). If your bid didn't win
+    // the auction, this is the winning candidate's bid. This field will only be
+    // populated if your bid participated in a first-price auction, and will not
+    // be populated if your bid was filtered prior to the auction.
+    optional double minimum_bid_to_win = 6;
+
+    // Deprecated. This field will be removed in February 2026.
+    // The minimum bid value necessary to have won the server-side component of
+    // the overall auction given that there was also an interest group bidding
+    // component to the overall auction which ran using the Protected Audience
+    // API. The value is expressed in CPM of the buyer account currency. The
+    // minimum bid to win for the overall auction, including bids from the
+    // server-side and the on-device interest group components, is populated in
+    // the minimum_bid_to_win field of the same BidFeedback object.
+    optional double sscminbidtowin = 14 [deprecated = true];
+
+    // Billable event rate multiplier that was applied to this bid during
+    // ranking. The adjustment reflects the likelihood that your bid would
+    // generate a billable event (namely, the ad renders successfully) if it won
+    // the auction, relative to the probability that other bids generate a
+    // billable event if they won the auction. This adjustment can be larger or
+    // smaller than 1. This affects the final ranking in the auction only; in
+    // particular, this multiplier does not affect the payment or whether the
+    // bid clears any floor price.
+    optional float billable_event_rate_bid_adjustment = 13 [default = 1];
+
+    // When a publisher uses an RTB auction and waterfall-based SDK mediation on
+    // the same query, the winner of the real-time auction must also compete in
+    // a mediation waterfall (which is ordered by price) to win the impression.
+    // If the bid participated in the auction and there was no waterfall, the
+    // value of this field is 0. If the bid participated in the auction and
+    // there was a waterfall, the value of this field is a price representing a
+    // sample bid from the eligible mediation networks that were higher than the
+    // auction winner, weighted by expected fill rate. This field can be used
+    // in conjunction with minimum_bid_to_win to train bidding models. The CPM
+    // is in your account currency.
+    optional double sampled_mediation_cpm_ahead_of_auction_winner = 8;
+
+    message EventNotificationToken {
+      // The contents of the token.
+      optional string payload = 1;
+    }
+
+    // The token included in the corresponding bid.
+    optional EventNotificationToken event_notification_token = 4;
+
+    // The creative ID included in the corresponding bid.
+    optional string buyer_creative_id = 5;
+
+    // Possible types of bid response feedback objects.
+    enum FeedbackType {
+      FEEDBACK_TYPE_UNSPECIFIED = 0;
+
+      // Feedback for a bid that was submitted on a bid response.
+      BID_FEEDBACK = 1;
+
+      // Feedback for an interest group buyer submitted on a bid response to
+      // particpate in an interest group bidding component of the auction run
+      // using the Protected Audience API.
+      INTEREST_GROUP_BUYER_FEEDBACK = 2;
+    }
+
+    // Deprecated. This field will be removed in February 2026.
+    // The type of the BidFeedback message. Google will send separate
+    // BidFeedback objects for:
+    // a) Each bid submitted on a bid response
+    // b) Each buyer submitted on a bid response to particpate in an interest
+    // group bidding component of the auction run using the Protected Audience
+    // API.
+    optional FeedbackType feedbacktype = 15 [deprecated = true];
+
+    // Deprecated. This field will be removed in February 2026.
+    // Origin of an interest group buyer that was included in the bid response.
+    // This field is populated only for feedback where a bidder opted in an
+    // interest group buyer to participate in the interest group bidding
+    // component of the overall auction run using the Protected Audience API.
+    // To learn more about origins, see https://www.rfc-editor.org/rfc/rfc6454.
+    // To learn more about interest group bidding and the Protected Audience
+    // API, see
+    // https://developers.google.com/authorized-buyers/rtb/fledge-origin-trial.
+    optional string buyerorigin = 16 [deprecated = true];
+
+    // Deprecated. This field will be removed in February 2026.
+    // The status code for the submitted interest group buyer. This field is
+    // only populated in the feedback for an interest group buyer that a bidder
+    // requested to enter into the interest group auction through the bid
+    // response. Individual creative status codes of bids submitted by the buyer
+    // in the on-device interest group auction are not available. See
+    // https://storage.googleapis.com/adx-rtb-dictionaries/interest-group-buyer-status-codes.txt
+    // for a list of interest group buyer status codes.
+    optional int32 igbuyerstatus = 17 [deprecated = true];
+  }
+  repeated BidFeedback bid_feedback = 1;
+
+  // This represents a unique ID for the overall query. In the event
+  // that there are multiple callouts for a query, all callout requests for that
+  // query will contain the same google_query_id.
+  optional string google_query_id = 2;
+
+  // Experimental feature; may be subject to change. See
+  // https://support.google.com/authorizedbuyers/answer/10890762 for more
+  // information.
+  //
+  // Describes the scope of frequency cap enforcement available for this
+  // request. Frequency caps to be enforced for a bid can be specified in the
+  // Bid.ext.fcap field.
+  enum FrequencyCappingScope {
+    // Default value which should not be used, or which can indicate that
+    // frequency cap scope could not be reliably determined.
+    FREQUENCY_CAPPING_SCOPE_UNKNOWN = 0;
+
+    // Frequency capping based on bid response specifications is not available
+    // for this request. A frequency-capped bid for a bid request with no
+    // frequency cap availability will be filtered prior to the auction.
+    FREQUENCY_CAPPING_SCOPE_NONE = 1;
+
+    // Frequency capping enforcement is available across multiple sites within
+    // the same browser.
+    FREQUENCY_CAPPING_SCOPE_BROWSER = 2;
+
+    // Frequency capping enforcement is available across multiple apps on the
+    // device, excluding browsers.
+    FREQUENCY_CAPPING_SCOPE_DEVICE = 3;
+
+    // Frequency capping enforcement is available within a single app.
+    FREQUENCY_CAPPING_SCOPE_APP = 4;
+
+    // Frequency capping enforcement is available within a single site.
+    FREQUENCY_CAPPING_SCOPE_SITE = 5;
+  }
+  optional FrequencyCappingScope fcap_scope = 4;
+
+  // Privacy treatments. Some fields in the bid request can be coarsened or
+  // redacted in order to protect user privacy. This message provides
+  // information about privacy treatments that apply to an ad opportunity
+  // offered through this request.
+  message PrivacyTreatments {
+    // Generalization that can be applied to an IP address field.
+    enum IpGeneralization {
+      // The IP address field is truncated: IPv4 to /24 or IPv6 to /48.
+      // The truncated octets are replaced by zeros so the field still parses
+      // as a valid IP address, for example "xxx.yyy.zzz.0" for IPv4.
+      IP_TRUNCATED = 0;
+
+      // The IP address field is provided in full.
+      IP_FULL = 1;
+
+      // The IP address field is redacted.
+      IP_REDACTED = 2;
+    }
+
+    // Generalization applied to the IP address field populated in the request
+    // (either BidRequest.device.ip or BidRequest.device.ipv6).
+    optional IpGeneralization ip = 1;
+
+    // Generalization that can be applied to the BidRequest.device.ua and
+    // BidRequest.device.sua fields.
+    enum UserAgentGeneralization {
+      // The BidRequest.device.ua and BidRequest.device.sua fields are provided
+      // in full.
+      USER_AGENT_FULL = 0;
+
+      // The BidRequest.device.ua and BidRequest.device.sua fields are
+      // generalized, which can include limiting browser and OS version
+      // information to major versions only and other changes to protect user
+      // privacy.
+      USER_AGENT_COARSE = 1;
+    }
+
+    // Generalization that was applied to the BidRequest.device.ua and
+    // BidRequest.device.sua fields, if any.
+    optional UserAgentGeneralization user_agent = 2;
+
+    // Specifies the reasons that ads returned in response to this request
+    // should not be personalized. This signal does not reflect user decisions
+    // on surfaces including iOS App Tracking Transparency
+    // (https://developer.apple.com/documentation/apptrackingtransparency) or
+    // Android advertising ID
+    // (https://support.google.com/googleplay/android-developer/answer/6048248).
+    // See BidRequest.device.lmt and BidRequest.device.ext.atts fields for more
+    // information.
+    enum NonPersonalizedAdsReason {
+      UNKNOWN = 0;
+
+      // The publisher has declared that this request should serve
+      // non-personalized ads independent of other signals.
+      // https://support.google.com/admanager/answer/9005435#npa
+      PUBLISHER_DECLARED_NPA = 1;
+
+      // The publisher has requested restricted data processing for this
+      // request. https://support.google.com/authorizedbuyers/answer/11121285
+      RESTRICT_DATA_PROCESSING = 2;
+
+      // The user has opted out of ads personalization.
+      USER_OPT_OUT = 3;
+    }
+    repeated NonPersonalizedAdsReason non_personalized_ads_reason = 6 [packed =
+      true];
+
+    // True if publisher grants the permission to allow the bidder to use bid
+    // request data to build user profiles for uses such as interest-based ads
+    // and remarketing. To use this data to build user profiles, a bidder must
+    // also win a given impression.
+    // Learn more about data collection controls:
+    // https://support.google.com/admanager/answer/11956152
+    optional bool allow_user_data_collection = 7;
+
+    // Reasons why on-device storage access could be restricted during the
+    // delivery of a winning ad.
+    enum DeviceStorageRestrictionReason {
+      DEVICE_STORAGE_RESTRICTION_UNKNOWN = 0;
+
+      // This request is subject to user consent requirements to allow for
+      // device storage access for advertising use cases such as ads
+      // measurement, frequency capping, or profiling, but consent was
+      // insufficient or not provided.
+      INSUFFICIENT_USER_CONSENT = 1;
+    }
+
+    // Indicates the reason why access of local device storage during winning ad
+    // rendering and measurement is restricted.
+    optional DeviceStorageRestrictionReason storagerestrict = 8;
+  }
+  optional PrivacyTreatments privacy_treatments = 5;
+
+  // Contains labels indicating the experiment or control groups that are
+  // active for this request. Work with your account manager to opt in to an
+  // experiment. The exact set of experiments available, their meaning, and
+  // whether there is any action required from the bidder varies from experiment
+  // to experiment and will be communicated separately.
+  //
+  // If empty, then this request is not part of any experiment or control group,
+  // or your bidder is not participating in any experiments.
+  repeated string expids = 6;
+}
+
+message UserExt {
+
+  message ConsentedProvidersSettings {
+    // Set of IDs corresponding to ad tech providers (ATPs) for whom the
+    // publisher has specified to Google that its EEA users have given legally
+    // valid consent to: 1) the use of cookies or other local storage where
+    // legally required; and 2) the collection, sharing, and use of personal
+    // data for personalization of ads by an ATP in accordance with Google's EU
+    // User Consent Policy.
+    //
+    // If a publisher is using the IAB Transparency and Consent Framework (TCF)
+    // v2 to manage user consent, this is the set of ATPs consented through the
+    // Additional Consent string (see
+    // https://support.google.com/admanager/answer/9681920 for details about
+    // Google's Additional Consent mode). ATPs consented through the TCF v2
+    // consent string are represented in the UserExt.consent field.
+    //
+    // A mapping of ATP ID to ATP name is posted at providers.csv.
+    repeated int64 consented_providers = 2 [packed = true];
+
+    // The raw Additional Consent string, which contains a list of certain
+    // Google Ad Tech Providers (ATPs). These ATPs are not registered with IAB
+    // TCF v2, but publishers or their Consent Management Providers (CMPs) have
+    // ensured that certain disclosures are given to, and consents are obtained
+    // from, end users, as required by Google's EU User Consent Policy. This
+    // field is only populated with the use of CMPs that are integrated with IAB
+    // TCF v2. Such CMPs use the raw Additional Consent string to indicate
+    // vendors that are not registered with IAB, and communicate end users' CMP
+    // choices to those vendors. The consented_providers field contains the set
+    // of vendors that mirrors the one represented by the additional_consent
+    // field, which is in the raw form. Vendors or any other third-party service
+    // providers must not create AC strings themselves.
+    //
+    // See https://support.google.com/admanager/answer/9681920 for more details
+    // about this field.
+    optional string additional_consent = 3;
+  }
+
+  // Information about the ad tech providers for whom the publisher has
+  // specified to Google that its EEA user has consented to the use of their
+  // personal data for ads personalization in accordance with Google's EU User
+  // Consent Policy. This field will only be populated when RegsExt.gdpr is
+  // true.
+  optional ConsentedProvidersSettings consented_providers_settings = 1;
+
+  // The web-safe base64-encoded IAB Transparency and Consent Framework (TCF) v2
+  // consent string fetched from the publisher's IAB Consent Management Platform
+  // (CMP). The structure of the string is defined by the IAB TCF v2. This field
+  // will be populated if the publisher has integrated with a CMP for TCF v2 and
+  // that CMP indicates that GDPR applies to this ad request and provides a
+  // valid consent string. See
+  // https://support.google.com/authorizedbuyers/answer/9789378 for additional
+  // information about the Google TCF v2 integration.
+  //
+  // See the IAB Global Vendor List at
+  // https://vendor-list.consensu.org/v2/vendor-list.json for details about the
+  // vendors listed in the consent string.
+  optional string consent = 2;
+
+  // Data made available by the publisher, such as secure signals.
+  // https://github.com/InteractiveAdvertisingBureau/openrtb/blob/master/extensions/2.x_official_extensions/eids.md
+  repeated .com.google.openrtb.BidRequest.User.EID eids = 5;
+
+  // Describes a user session in a given app or site. The session is reset after
+  // a sufficiently long break in user activity.
+  message Session {
+    // Time in seconds since the first ad request in the session. Currently the
+    // session duration is only supported for mobile app requests.
+    optional int32 duration = 1;
+
+    // Previous number of total user ad requests made during the session. Scoped
+    // to the app and resets at the same time as duration. Currently, available
+    // on mobile app requests and webview requests, where webview is configured
+    // with WebView API for Ads. See
+    // https://developers.google.com/admob/android/browser/webview/api-for-ads
+    optional int32 depth = 2;
+
+    // Previous number of total user ad requests since the time the current app
+    // was last started. Scoped to the app and resets on app open. Currently,
+    // available on mobile app requests and webview requests, where webview is
+    // configured with WebView API for Ads. See
+    // https://developers.google.com/admob/android/browser/webview/api-for-ads
+    optional int32 requestssinceappopen = 3;
+
+    // Prior number of clicks within the app as measured by Google Mobile Ads
+    // SDK from the time the current app was last started.
+    optional int32 priorclicks = 4;
+  }
+
+  // The current user session.
+  optional Session session = 6;
+
+  // The amount of time, in seconds, since the ID in `BidRequest.user.id` was
+  // created.
+  optional int32 idage = 7;
+}
+
+message UIDExt {
+  // The source type of the UID. See details at
+  // https://developers.google.com/authorized-buyers/rtb/openrtb-guide#uid-stype
+  optional string stype = 1;
+}
+
+message DataExt {
+  // Identifies the taxonomy that the segment IDs belong to.
+  // Google supports the following taxonomies:
+  // https://github.com/InteractiveAdvertisingBureau/Taxonomies/blob/main/Audience%20Taxonomies/Audience%20Taxonomy%201.1.tsv
+  // IAB Tech Lab Audience Taxonomy 1.1 = 4
+  // https://github.com/InteractiveAdvertisingBureau/Taxonomies/blob/main/Content%20Taxonomies/Content%20Taxonomy%202.2.tsv
+  // IAB Tech Lab Content Taxonomy 2.2 = 6
+  // https://github.com/InteractiveAdvertisingBureau/Taxonomies/blob/main/Content%20Taxonomies/Content%20Taxonomy%203.0.tsv
+  // IAB Tech Lab Content Taxonomy 3.0 = 7
+  // https://github.com/patcg-individual-drafts/topics/blob/main/taxonomy_v1.md
+  // Chromium Topics API = 600
+  // https://github.com/patcg-individual-drafts/topics/blob/main/taxonomy_v2.md
+  // Chromium Topics API V2 = 601
+  optional int32 segtax = 1;
+}
+
+message DeviceExt {
+  // Represents a short-lived user session on CTV/OTT devices,
+  // with a maximum session duration of 6 hours.
+  // The use of session_id is never allowed for ads personalization.
+  // session_id may only be used for frequency capping, competitive exclusions
+  // or related purposes. This field is populated with web-safe base64 alphabet.
+  optional string session_id = 1;
+
+  // (iOS Only) An integer passed to represent the app's app tracking
+  // authorization status, where 0 = not determined, 1 = restricted, 2 = denied,
+  // 3 = authorized. This value is retrieved from ATTrackingManager and
+  // provided as is. See
+  // https://github.com/InteractiveAdvertisingBureau/openrtb/blob/master/extensions/community_extensions/skadnetwork.md#bid-request-1
+  //
+  // For more information about iOS's app tracking authorization status, see:
+  // https://developer.apple.com/documentation/apptrackingtransparency/attrackingmanager/authorizationstatus
+  optional int32 atts = 3;
+
+  // (iOS Only) The IDFV (Identifier for Vendor) of the device, scoped to a
+  // single vendor. Only passed when IDFA is unavailable. See
+  // https://github.com/InteractiveAdvertisingBureau/openrtb/blob/main/extensions/community_extensions/skadnetwork.md#bid-request-1
+  //
+  // For more information about iOS's IDFV, see:
+  // https://developer.apple.com/documentation/uikit/uidevice/identifierforvendor
+  optional string ifv = 15;
+
+  // Indicates whether the user's device is on a metered connection.
+  //
+  // Currently only available for Android app and WebView requests, and is
+  // determined by the isActiveNetworkMetered() function on
+  // ConnectivityManager:
+  // https://developer.android.com/reference/android/net/ConnectivityManager#isActiveNetworkMetered()
+  optional bool metereddata = 6;
+
+  // The remaining battery life of the device represented as a float, where 1
+  // indicates a fully charged battery and 0 means the device is on reserve
+  // capacity and is about to shut down. Currently only available for Android
+  // mobile app and webview requests.
+  optional float chargelevel = 8;
+
+  // Indicates whether the device is currently being charged.
+  // Currently only available for Android mobile app and webview requests.
+  optional bool charging = 9;
+
+  // The remaining disk space, in megabytes, in the data partition available for
+  // application installation, rounded to the nearest 100MB to protect user
+  // privacy (https://source.android.com/docs/core/architecture/partitions).
+  // Currently only available for Android mobile app and webview requests.
+  optional int32 diskspace = 10;
+
+  // Describes the state of the device audio output.
+  enum AudioOutputMethod {
+    AUDIO_UNKNOWN = 0;
+
+    // Audio is playing through the device's speakers.
+    AUDIO_SPEAKER = 1;
+
+    // Audio is playing through a device plugged into the headphone
+    // jack.
+    AUDIO_HEADPHONE = 2;
+
+    // Device is set to silent.
+    AUDIO_SILENT = 3;
+
+    // Any other output such as playing from a docking station or Bluetooth.
+    AUDIO_OTHER = 5;
+  }
+
+  // The device audio state. Available for both Android and iOS.
+  optional AudioOutputMethod audioout = 11 [default = AUDIO_UNKNOWN];
+
+  // DOOH device information.
+  message Dooh {
+    // The venue type ID of the DOOH device.
+    // Uses the OpenOOH venue type taxonomy
+    // (https://github.com/openooh/venue-taxonomy/blob/main/specification-1.1.md).
+    // For more information, see:
+    // https://support.google.com/admanager/answer/10678356?#venuetype&zippy=%2Cvenuetype-venue-type
+    optional int64 venuetypeid = 1;
+  }
+
+  // If present, describes a DOOH device that will render the impression.
+  optional Dooh dooh = 12;
+}
+
+message RegsExt {
+  // This field will be set to true in either of the two following cases:
+  //   1. Google receives a valid IAB Transparency and Consent Framework (TCF)
+  //      v2 consent string and the Consent Management Platform indicates that
+  //      GDPR applies to this ad request.
+  //   2. Google does not receive an IAB TCF v2 consent string and, based on
+  //      information available to Google, this impression will serve to an
+  //      EEA user.
+  // It does not constitute legal guidance on GDPR.
+  optional bool gdpr = 1;
+
+  // This field will be set to true when, based on information available to
+  // Google, this impression will serve to a user in Brazil. See
+  // https://storage.googleapis.com/adx-rtb-dictionaries/lgpd-providers.csv for
+  // the list of ad tech providers that are allowed to serve on LGPD-enforced
+  // requests.
+  //
+  // See https://support.google.com/authorizedbuyers/answer/9928204 for more
+  // information on LGPD.
+  optional bool lgpd = 2;
+
+  // The Digital Services Act (DSA) transparency requirements. See
+  // https://support.google.com/admanager/answer/14335032.
+  message Dsa {
+    // Values indicating whether DSA declarations should be included in the bid
+    // response and, if so, whether or not the publisher is an Online Platform
+    // (OP) or Very Large Online Platform (VLOP), as defined by the DSA.
+    enum DsaSupport {
+      // DSA declarations are not required in the bid response.
+      NOT_REQUIRED = 0;
+
+      // DSA declarations are supported, but not required in the bid response.
+      SUPPORTED = 1;
+
+      // DSA declarations are required in the bid response.
+      REQUIRED = 2;
+
+      // DSA declarations are required in the bid response and the publisher is
+      // an OP or VLOP.
+      REQUIRED_BY_ONLINE_PLATFORM = 3;
+    }
+
+    // Indicates if DSA declarations should be included in the bid response.
+    // Bids where DSA declarations are required but not included will not be
+    // accepted.
+    optional DsaSupport dsarequired = 1;
+
+    // Options describing a publisher's ability to render DSA transparency
+    // declarations.
+    enum PublisherRenderingSupport {
+      // Publisher can't render.
+      PUBLISHER_UNABLE_TO_RENDER = 0;
+
+      // Publisher could render depending on the buyer's rendering capability as
+      // described in the Bid.ext.dsa.adrender field.
+      PUBLISHER_CAN_RENDER = 1;
+
+      // Publisher will render regardless of the buyer's rendering capability as
+      // described in the Bid.ext.dsa.adrender field.
+      PUBLISHER_WILL_RENDER = 2;
+    }
+
+    // Indicates if the publisher will render the DSA Transparency info. This
+    // will signal if the publisher is able to and intends to render the icon
+    // or other appropriate user-facing symbol and display the DSA transparency
+    // info to the end user.
+    optional PublisherRenderingSupport pubrender = 2;
+
+    // Options describing if a publisher requires DSA transparency declarations.
+    enum DataToPublisher {
+      // Do not send transparency data.
+      DO_NOT_SEND = 0;
+
+      // Optional to send transparency data.
+      OPTIONAL = 1;
+
+      // Send transparency data.
+      SEND = 2;
+    }
+
+    // Indicates whether the bidder should provide DSA transparency declarations
+    // in the bid response. A publisher may need this information for audit or
+    // other purposes, even if they will not render the transparency
+    // declarations themselves.
+    optional DataToPublisher datatopub = 3;
+  }
+
+  // The Digital Services Act (DSA) transparency information requirements.
+  optional Dsa dsa = 3;
+}
+
+message DealExt {
+  // The type of the deal. Note that Authorized Buyers policy overrides apply to
+  // all Programmatic Guaranteed and Preferred Deal bids, and do not apply to
+  // bids for other deal types.
+  enum DealType {
+    UNKNOWN_DEAL_TYPE = 0;
+
+    // Bids are fixed-price and evaluated before the Open Auction. Bidders are
+    // not required to bid with Preferred Deals when they are present on the bid
+    // request. See https://support.google.com/authorizedbuyers/answer/2604595
+    // for more information.
+    PREFERRED_DEAL = 1;
+
+    // Bids participate in a Private Auction against a select list of buyers
+    // with specific floors. See
+    // https://support.google.com/authorizedbuyers/answer/2839853 for more
+    // information.
+    PRIVATE_AUCTION = 2;
+
+    // Bids are fixed-price and evaluated before the Open Auction. Bidders are
+    // expected to bid with Programmatic Guaranteed deals whenever they are
+    // present on a bid request and the must_bid field is true in order to
+    // ensure that the number of impressions agreed upon for a given deal are
+    // served. See https://support.google.com/authorizedbuyers/answer/7174589
+    // for more information.
+    PROGRAMMATIC_GUARANTEED = 3;
+
+    // The deal ID is an identifier for a collection of Open Auction inventory
+    // matching a given set of targeting criteria. See
+    // https://support.google.com/authorizedbuyers/answer/7516884 for more
+    // information.
+    AUCTION_PACKAGE = 4;
+
+    // Package of inventory that a publisher makes available to either all
+    // buyers or selected bidders. Bids participate in auction in the same way
+    // as private auction candidates. See
+    // https://support.google.com/authorizedbuyers/answer/12817370 for more
+    // information.
+    MARKETPLACE_PACKAGE = 5;
+  }
+  optional DealType deal_type = 1 [default = UNKNOWN_DEAL_TYPE];
+
+  // This field is only applicable to Programmatic Guaranteed deals. The
+  // buyer is allowed to skip bidding on the impression if this field is
+  // false. When it is true, the buyer is required to bid on this deal for
+  // this impression opportunity. This field will always be filled explicitly
+  // for the JSON wire format.
+  optional bool must_bid = 2 [default = true];
+
+  // Whether the publisher has exempted this deal from configured blocks. This
+  // setting does not override AdX policies or Ad Review Center decisions. See
+  // https://support.google.com/authorizedbuyers/answer/6114194 for more
+  // information.
+  optional bool publisher_blocks_overridden = 3;
+
+  // Experimental field; subject to change.
+  // An enum declaring the host of the creative, which will only be
+  // populated for Programmatic Guaranteed deals.
+  // Currently, this field should only ever be set to
+  // CREATIVE_SOURCE_ADVERTISER.
+  enum CreativeSourceType {
+    CREATIVE_SOURCE_UNKNOWN = 0;
+
+    // The creative is hosted by the advertiser, which means the bidder is
+    // required to provide a creative in the bid response.
+    CREATIVE_SOURCE_ADVERTISER = 1;
+
+    // The creative is hosted by the publisher, which means the bidder
+    // does not need to include a creative in the bid response.
+    // For more information on publisher-hosted creatives, see
+    // https://support.google.com/admanager/answer/9243220.
+    // This feature isn't currently supported for RTB bidders.
+    CREATIVE_SOURCE_PUBLISHER = 2;
+  }
+  optional CreativeSourceType creative_source = 4 [default =
+    CREATIVE_SOURCE_ADVERTISER];
+
+  // Constraints for creatives that can apply when bidding on a deal.
+  message CreativeConstraints {
+    // The allowed ad types of the deal. If empty, there are no deal-specific
+    // allowed ad type restrictions for the deal. In that case, bidders should
+    // refer to the presence of Banner, Video, Audio or Native objects in the
+    // BidRequest to check the allowed formats.
+    repeated .com.google.openrtb.CreativeMarkupType mtypes = 1 [packed = true];
+
+    // Possible creative skippability requirements.
+    enum SkippabilityConstraint {
+      // Skippable and non-skippable creatives are allowed.
+      ALLOW_SKIPPABLE = 0;
+
+      // Only skippable creatives are allowed.
+      REQUIRE_SKIPPABLE = 1;
+
+      // Only non-skippable creatives are allowed.
+      BLOCK_SKIPPABLE = 2;
+    }
+
+    // Whether skippable creatives are allowed. For PROGRAMMATIC_GUARANTEED or
+    // PREFERRED_DEAL deals that specifically allow video or audio ad types, it
+    // is always set. For the skippability setting of other deal types or open
+    // auction bidding, refer to the corresponding BidRequest-level field
+    // video.skip.
+    optional SkippabilityConstraint skippability = 2 [default =
+      ALLOW_SKIPPABLE];
+
+    // Maximum video ad duration in seconds. For PROGRAMMATIC_GUARANTEED or
+    // PREFERRED_DEAL deals that specifically allow video or audio ad types, it
+    // is always set. For the allowed max duration of other deal types or open
+    // auction bidding, refer to the corresponding BidRequest-level field
+    // video.maxduration.
+    optional int32 maxduration = 3;
+  }
+
+  // Creative constraints for this deal. If this is not set, bidders should
+  // refer to the BidRequest-level setting of each field.
+  optional CreativeConstraints creative_constraints = 5;
+
+  // Indicates the eligible billing IDs for this deal. If this list is not
+  // empty, the billing ID selected in `BidResponse.seatbid.bid.ext.billing_id`
+  // must be one of these IDs when submitting a bid on this deal. If this list
+  // is empty, then the bid on this deal can be attributed to any of the billing
+  // IDs in `BidRequest.imp.ext.billing_id`.
+  repeated int64 billing_id = 6 [packed = true];
+}
+
+message SourceExt {
+  // Identifier of the OM SDK integration. Equivalent to
+  // BidRequest.AdSlot.omidpn in the Google protocol. For more info,
+  // see the OpenRTB Advisory for Open Measurement SDK:
+  // https://github.com/InteractiveAdvertisingBureau/AdCOM/blob/master/OpenRTB%20support%20for%20OMSDK.md#openrtb-and-adcom.
+  optional string omidpn = 1;
+
+  // Version of the OM SDK integration. Equivalent to BidRequest.AdSlot.omidpv
+  // in the Google protocol. For more info, see the OpenRTB Advisory for
+  // Open Measurement SDK:
+  // https://github.com/InteractiveAdvertisingBureau/AdCOM/blob/master/OpenRTB%20support%20for%20OMSDK.md#openrtb-and-adcom.
+  optional string omidpv = 2;
+}
+
+message GeoExt {
+  // The device's approximate geographic location. See the geo-table.csv table
+  // available at https://developers.google.com/authorized-buyers/rtb/data for
+  // a list of IDs. This field is provisional, intended only to help with
+  // migration from the Google Authorized Buyers protocol to OpenRTB; it will
+  // be removed in the future. The standard fields in BidRequest.device.geo
+  // should be used instead; they contain the same location as the
+  // geo_criteria_id and both are subject to the same privacy treatments.
+  // See Geotargeting Guide:
+  // https://developers.google.com/authorized-buyers/rtb/geotargeting
+  optional int32 geo_criteria_id = 1;
+}
+
+message VideoExt {
+  // Video placement type inferred by Google for this impression. This field
+  // is always filled and can be different from BidRequest.imp.video.plcmt (the
+  // publisher-declared placement type).
+  optional .com.google.openrtb.Plcmt inferredplcmt = 3 [default =
+    PLCMT_UNKNOWN];
+
+  // If true, the video is embedded on a page outside the publisher's domain.
+  // When this is set, BidRequest.{app/site}.content.producer.domain points to
+  // the domain of the content producer, and the BidRequest.{app/site}.page
+  // field is the page in which the video is embedded.
+  optional bool embeddedoffsite = 4;
+}
+
+// SKAdNetwork API starting from version 2.2 supports multiple ad
+// presentation options specified by the `fidelity-type` parameter of the
+// SKAdNetwork signature. The following are the fidelity types supported by
+// Apple. For more info visit:
+// https://developer.apple.com/documentation/storekit/skadnetwork/signing_and_providing_ads
+enum SKAdNetworkFidelityType {
+  // Attribution for app installs within 24 hours of viewing an ad for at least
+  // 3 seconds. Supported for SKAdnetwork version 2.2 and up. For more info see:
+  // https://developer.apple.com/documentation/storekit/skadnetwork/generating_the_signature_to_validate_view-through_ads
+  VIEW_THROUGH_ADS = 0;
+
+  // Attribution for app installs initiated from the StoreKit-rendered App Store
+  // product page driven by ad clicks. Supported for all SKAdNetwork versions.
+  // For more info see:
+  // https://developer.apple.com/documentation/storekit/skadnetwork/generating_the_signature_to_validate_storekit-rendered_ads
+  STOREKIT_RENDERED_ADS = 1;
+}
+
+extend .com.google.openrtb.BidRequest.Imp {
+  optional ImpExt imp = 1009;
+}
+extend .com.google.openrtb.BidRequest.App {
+  optional AppExt app = 1011;
+}
+extend .com.google.openrtb.BidRequest.Imp.Banner {
+  optional BannerExt banner_ext = 1014;
+}
+extend .com.google.openrtb.BidResponse {
+  optional BidResponseExt bid_response = 1005;
+}
+extend .com.google.openrtb.BidResponse.SeatBid.Bid {
+  optional BidExt bid = 1014;
+}
+extend .com.google.openrtb.NativeRequest {
+  optional NativeRequestExt native_ext = 1001;
+}
+extend .com.google.openrtb.NativeResponse.EventTracker {
+  optional EventTrackerExt eventtrackers = 1000;
+}
+extend .com.google.openrtb.BidRequest.Publisher {
+  optional PublisherExt publisher = 1002;
+}
+extend .com.google.openrtb.BidRequest.Site {
+  optional SiteExt site = 1010;
+}
+extend .com.google.openrtb.BidRequest {
+  optional BidRequestExt bid_request = 1018;
+}
+extend .com.google.openrtb.BidRequest.User {
+  optional UserExt user = 1007;
+}
+extend .com.google.openrtb.BidRequest.User.EID.UID {
+  optional UIDExt uids = 1001;
+}
+extend .com.google.openrtb.BidRequest.Data {
+  optional DataExt data = 1000;
+}
+extend .com.google.openrtb.BidRequest.Device {
+  optional DeviceExt device = 1066;
+}
+extend .com.google.openrtb.BidRequest.Regs {
+  optional RegsExt regs = 1001;
+}
+extend .com.google.openrtb.BidRequest.Imp.Pmp.Deal {
+  optional DealExt deal = 1010;
+}
+extend .com.google.openrtb.BidRequest.Source {
+  optional SourceExt source = 1059;
+}
+extend .com.google.openrtb.BidRequest.Geo {
+  optional GeoExt geo = 1004;
+}
+extend .com.google.openrtb.BidRequest.Imp.Video {
+  optional VideoExt video = 1031;
+}
