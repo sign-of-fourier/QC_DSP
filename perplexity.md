@@ -78,7 +78,9 @@ Implement multivariate GPR with learned cross-ad kernels that capture cannibaliz
 <div align="center">⁂</div>
 
 [^1]: http://proceedings.mlr.press/v32/gopalan14.pdf
+
 [^2]: https://pixis.ai/blog/8-ways-to-avoid-ad-cannibalization-in-paid-media-campaigns/
+
 [^3]: https://www.reddit.com/r/PPC/comments/7yo9cf/quantifying_cannibalization_of_organic_traffic/
 [^4]: https://www.topsort.com/post/how-to-solve-the-problem-of-ad-cannibalization-in-retail-media
 [^5]: https://www.moburst.com/blog/what-is-cannibalization-in-aso/
