@@ -4,12 +4,21 @@ More clicks in fewer experiements
 <img src="AdLearning.png"></img>
 =======
 # OpenRTB Bidder Framework
+=======
+# RTB Bidder Simulation Pipeline
 
-A Go framework for building a **Google Authorized Buyers (AdX) OpenRTB bidder** that also supports **offline simulation** using the *same* bidding logic.
+### End-to-End Synthetic Data Generation + Logging Infrastructure
 
-- ✅ **Production mode:** Handle real-time Google OpenRTB Protobuf bid requests and respond in under ~100ms.  
-- ✅ **Simulation mode:** Run high-volume synthetic auctions for experimentation, budgeting, and ML strategy testing.  
-- ✅ **Unified bidding logic:** Same engine and strategy used in both prod and sim—no duplicated logic.
+This repository implements a complete RTB (Real-Time Bidding) simulation environment for testing and data collection:
+
+* **Go-based OpenRTB bidder** (local, no bidding logic yet)
+* **Protobuf decoding** for realistic RTB requests
+* **Kinesis Firehose → S3** log ingestion pipeline
+* **Synthetic OpenRTB traffic generator** (replaces real exchange)
+* **Terraform-managed AWS infrastructure**
+* Clear path toward production deployment with bidding logic
+
+This system is currently focused on **synthetic data simulation** to test the complete logging pipeline from request generation to S3 storage.
 
 ## Bayesian Optimization
 - GPR: optimization of ads based on semantic content
@@ -20,294 +29,381 @@ A Go framework for building a **Google Authorized Buyers (AdX) OpenRTB bidder** 
 =======
 ---
 
-## 📐 Architecture Overview
+## ⭐ High-Level Overview
 
-This project uses a **hexagonal (ports-and-adapters)** architecture to separate:
+### End-to-End RTB Simulation + Logging Pipeline
 
-### **Core Domain (shared)**
-Located in: `internal/core`
+Your system is composed of four major stages, each responsible for part of the overall lifecycle:
 
-Contains the business logic:
-
-- Auction normalization (`AuctionContext`)
-- Campaign budgeting & pacing (`CampaignState`)
-- Bidding strategy interface (`Strategy`)
-- The `Engine` that orchestrates decisions
-- Metrics (`Metrics`)
-- Campaign storage (`CampaignStore`)
-
-### **Production Adapter**
-Located in: `internal/runtime/google_rtb_server.go`
-
-- Receives **Google Authorized Buyers** Protobuf `BidRequest`
-- Converts to `AuctionContext`
-- Uses the shared `Engine` to compute a bid
-- Builds a Protobuf `BidResponse` and returns it to Google
-
-### **Simulation Adapter**
-Located in: `internal/sim`
-
-- Generates synthetic auctions (`Generator`)
-- Runs them through the same engine (`Runner`)
-- Computes wins, spend, CTR/CVR outcomes
+```
+[1. Synthetic Loadgen]  →  [2. Go Bidder]  →  [3. Firehose]  →  [4. S3 Data Lake]
+   (Fake Exchange)         (Local/No-Bid)      (Streaming)       (ML Training)
+```
 
 ---
 
-## 📁 Directory Layout
-openrtb-framework/
-├─ go.mod
-├─ proto/
-│ ├─ openrtb.proto # Google’s main OpenRTB schema
-│ ├─ openrtb-adx.proto # Google-specific extensions
-│ └─ openrtb/ # Generated Go protobuf code
-│ ├─ openrtb.pb.go
-│ └─ openrtb_adx.pb.go
-├─ cmd/
-│ ├─ bidder/ # Production bidder entrypoint
-│ │ └─ main.go
-│ └─ simulate/ # Offline simulator CLI
-│ └─ main.go
-└─ internal/
-├─ core/ # Shared domain logic
-│ ├─ types.go
-│ ├─ strategy.go
-│ ├─ strategy_simple.go
-│ ├─ engine.go
-│ ├─ metrics.go
-│ └─ store_inmemory.go # In-memory CampaignStore
-├─ runtime/ # Production OpenRTB server
-│ └─ google_rtb_server.go
-├─ sim/ # Simulation engine
-│ ├─ generator.go
-│ └─ runner.go
-└─ config/
-└─ config.go
+## 1. Synthetic Traffic Generator (Loadgen)
+
+### Purpose
+Pretend to be Google and generate realistic RTB requests.
+
+The synthetic generator (`cmd/loadgen`) plays the role of an exchange or Google Authorized Buyers.
+
+### What it does
+
+* Constructs valid `BidRequest` protobuf messages with:
+  * `imp` (impressions)
+  * `device` (OS, type, user agent)
+  * `geo` (country, city)
+  * `site` (domain, page)
+  * `user` (ID)
+  * floors, sizes, etc.
+* Encodes via `proto.Marshal`
+* POSTs to your bidder endpoint:
+  ```
+  POST http://localhost:8080/openrtb
+  ```
+* At controlled rate (QPS) and volume (N requests)
+
+### Benefits
+
+* ✅ Safe, cost-free, realistic data feed
+* ✅ Stress-test your bidder logic
+* ✅ Realistic distributions (domains, OS, country, floors)
+* ✅ No reliance on a Google RTB seat yet
+
+**Think of it as synthetic OpenRTB traffic that behaves like a miniature exchange.**
+
+---
+
+## 2. Your Go Bidder (`/openrtb`)
+
+### Purpose
+Receive bid requests, decode them, log them, and always return 204 (no-bid).
+
+### Current Implementation
+
+The bidder is **hosted locally** without bidding logic. This is purely for testing the data pipeline.
+
+### What it does
+
+1. Accepts HTTP POST requests on `/openrtb`
+2. Reads binary protobuf body
+3. `proto.Unmarshal` → `pb.BidRequest`
+4. **Always returns 204 No Content** (no bidding logic)
+5. Writes normalized logs via Firehose logger:
+   * `auction_id`
+   * `timestamp`
+   * `device`
+   * `geo`
+   * `floor`
+   * `size`
+   * `user_id`
+   * `site_domain`
+
+### Benefits
+
+* ✅ Ready-to-deploy RTB bidder interface
+* ✅ Fully correct protobuf decoding pipeline
+* ✅ Safe "no-bid" behavior while learning/testing
+* ✅ Real normalized data for downstream ML/simulation
+
+**This is the exact front end your real bidder will use.**
+
+### Future: EC2 Deployment with Bidding Logic
+
+In the future, the bidder will be:
+* Hosted on **EC2** (not local)
+* Include **real bidding logic** (bid price calculation, strategy)
+* Return **BidResponse** messages
+* Scale horizontally with load balancing
+
+---
+
+## 3. Firehose Logger (Go → AWS Kinesis Firehose)
+
+### Purpose
+Reliably stream logs from your bidder to S3.
+
+### How it works
+
+1. **JSON marshalling** of your normalized log struct
+2. Sends to Firehose via AWS SDK (buffered mode)
+3. Firehose:
+   * Buffers by size/time
+   * Compresses (GZIP)
+   * Writes to S3 organized by:
+     ```
+     dt=YYYY-MM-DD/
+     hr=HH/
+     ```
+
+### Benefits
+
+* ✅ Zero data loss
+* ✅ Automatic retry/backoff
+* ✅ Cost-efficient streaming ingestion
+* ✅ Perfect for high-throughput RTB workloads
+* ✅ Ideal training data format for ML systems
+
+**This is your core data ingestion pipeline.**
+
+---
+
+## 4. S3 Storage Lake (Raw RTB Logs Over Time)
+
+### Purpose
+Store all impression-level features for analysis, ML training, and simulation.
+
+### What gets stored
+
+Once Firehose flushes, your S3 bucket contains data like:
+
+```
+s3://qc-dsp-bidreq-logs/bid_requests/dt=2026-02-04/hr=18/part-0001.json.gz
+```
+
+Each file is:
+* **Gzipped NDJSON** (newline-delimited JSON)
+* **Partitioned by time** (date/hour)
+* **Indexable** by Glue/Athena
+* **Machine learning ready**
+
+### Use Cases
+
+#### ML / RL / Bandit Training
+* Learn CTR models
+* Floor optimization
+* Scene distribution modeling
+* Value estimation
+
+#### Simulation / Replay Environment
+Replays historical distribution of:
+* Geo
+* Device
+* Floor
+* Inventory
+* Traffic patterns
+
+Tests bidding policies **offline before going live**:
+* ✅ Enables safe experimentation (no spend)
+* ✅ Validates strategy changes
+* ✅ Optimizes before production
+
+**This is your source of truth for everything downstream.**
+
+---
+
+## 🎯 Current System Focus
+
+This version is for **synthetic data simulation** to test sinking logs to S3:
+
+* ✅ **Loadgen** generates fake but realistic RTB traffic
+* ✅ **Go bidder** runs locally without bidding logic
+* ✅ **Firehose** streams data reliably
+* ✅ **S3** stores partitioned logs for analysis
+
+### What's NOT included yet:
+* ❌ Real bidding logic (always returns 204)
+* ❌ EC2 deployment (bidder runs locally)
+* ❌ Real exchange integration
+* ❌ BidResponse generation
+
+---
 
 ## 🚀 Getting Started
 
-### **Prerequisites**
-
-- Go **1.22+**
-- `protoc` (Protocol Buffer compiler)
-- Protobuf plugins:
+### Prerequisites
 
 ```bash
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+# Install Go
+brew install go
+
+# Install Protobuf Compiler
+brew install protobuf
+
+# Install AWS CLI
+brew install awscli
+aws configure
+
+# Install Terraform
+brew tap hashicorp/tap
+brew install hashicorp/tap/terraform
 ```
 
-1. Clone the repo
+---
+
+### Step 1: Build the Bidder 
+
 ```bash
-git clone https://github.com/yourname/openrtb-framework.git
-cd openrtb-framework
-go mod tidy
-```
-📦 Download and Generate OpenRTB Protos
-1. Download required files from Google
-
-Download from the Google Authorized Buyers documentation:
-
-openrtb.proto
-
-openrtb-adx.proto
-
-Place them inside:
-./proto/
-
-2. Generate Go protobuf code
-
-From inside proto/:
-```bash
-protoc \
-  --go_out=. \
-  --go_opt=paths=source_relative \
-  openrtb.proto openrtb-adx.proto
+go mod tidy  
+go build ./...
 ```
 
-This generates:
+Set environment variables and Run locally:
 
-proto/openrtb.pb.go
-
-proto/openrtb-adx.pb.go
-
-These files contain the native Go structs used to decode/encode Protobuf RTB messages.
-
-🏭 Running the Bidder (Production Mode)
-
-The production bidder listens for Google OpenRTB requests.
-
-Set environment variables
 ```bash
-export BIDDER_PORT=8080
-export BIDDER_SEAT_ID=YOUR_SEAT_ID
-export BIDDER_DEFAULT_CAMPAIGN_ID=default
-export BIDDER_LOG_LEVEL=INFO
-```
-
-Run
-```bash
+source ./source_env.sh
 go run ./cmd/bidder
 ```
 
-Your bidder now exposes:
-```bash
-POST http://localhost:8080/openrtb
-Content-Type: application/octet-stream
-
-<protobuf binary BidRequest>
-```
-
-And returns:
-
-200 OK + Protobuf BidResponse on bid
-
-204 No Content for no-bid
-
-This endpoint is where Google Authorized Buyers will call your bidder.
-
-🧪 Running the Simulator
-
-Simulations allow offline experimentation using the exact same bidding engine.
+Check health:
 
 ```bash
-go run ./cmd/simulate
+curl -v http://localhost:8080/health
 ```
 
-This will:
-
-Generate 100k synthetic auctions
-
-Run them through your bidding engine
-
-Simulate clearing prices & outcomes
-
-Print a summary (spend, impressions, bids, etc.)
-
-Update:
-
-generator.go → auction distribution
-
-runner.go → market logic
-
-strategy_simple.go → your bidding logic
-
-🧠 Core Concepts
-AuctionContext
-
-A normalized representation of an impression opportunity.
-
-Built from:
-
-Prod: Google OpenRTB BidRequest + Imp
-
-Sim: Synthetic generator
-
-Contains fields like:
-
-Geo, device, OS
-
-Site/app context
-
-Ad slot format (banner/video/native)
-
-Size
-
-Floor CPM
-
-User ID / privacy flags
-
-Auction timestamp
-
-CampaignState
-
-Tracks your budget, pacing, and strategy state:
-
-DailyBudget
-
-SpentToday
-
-TotalBudget
-
-TargetCPA / TargetROAS
-
-Allowed geos / sites / segments
-
-Active/inactive
-
-Strategy & Engine
-
-Strategy decides how much to bid
-
-Engine applies:
-
-Campaign state
-
-Budget checks
-
-Strategy logic
-
-Returns a BidDecision
-
-Both prod and sim call the same Engine.EvaluateAuction.
-
-🔧 Where to Plug in ML, Budgets, and Real Logic
-
-Here’s where the "real DSP logic" lives:
-
-1. ML Models
-
-Replace strategy_simple.go with:
-
-gRPC call to Python model server
-
-TensorFlow/Caffe model embedded in Go
-
-Value bidding using CTR × CVR × value
-
-2. Campaign Storage
-
-Replace store_inmemory.go with:
-
-Redis
-
-PostgreSQL
-
-DynamoDB
-
-Bigtable
-
-3. Creative Mapping
-
-Use your own DB:
-
-Creative IDs
-
-Landing pages
-
-Creative attributes
-
-Pre-approved creatives for Google AdX
-
-4. BidResponse Extensions
-
-Build real markup:
-
-adm
-
-nurl / burl
-
-ext.impression_tracking_url
-
-Use ${AUCTION_PRICE} macro for win notifications
-
-5. Full Observability
-
-Extend metrics.go and expose:
-
-Prometheus metrics
-
-Log structured events
-
-Latency histograms
-
-Bid/no-bid reasons
+---
+
+### Step 2: Run the Synthetic Loadgen
+
+```bash
+
+# Optional: override defaults
+export BIDDER_URL=http://localhost:8080/openrtb
+export LOADGEN_NUM_REQUESTS=50
+
+go run ./cmd/loadgen
+```
+
+Example load test @ 200 QPS for 10 seconds:
+
+```bash
+./loadgen \
+  -endpoint=http://localhost:8080/openrtb \
+  -qps=200 \
+  -duration=10s
+```
+
+Example high-volume test @ 2000 QPS:
+
+```bash
+./loadgen \
+  -endpoint=http://localhost:8080/openrtb \
+  -qps=2000 \
+  -duration=30s
+```
+
+---
+
+### Step 3: Deploy AWS Infrastructure (Terraform)
+
+```bash
+cd infra/terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+This provisions:
+* Firehose delivery stream
+* S3 bucket with partitioning
+* IAM roles/policies
+* CloudWatch log groups
+
+---
+
+### Step 4: Verify Data in S3
+
+After running loadgen, check your S3 bucket:
+
+```bash
+aws s3 ls s3://$S3_BUCKET_NAME/bid_requests/ --recursive
+```
+
+Expected output:
+```
+2026-02-04 18:23:45  123456  bid_requests/dt=2026-02-04/hr=18/part-0001.json.gz
+2026-02-04 18:28:12  234567  bid_requests/dt=2026-02-04/hr=18/part-0002.json.gz
+```
+
+Download and inspect:
+
+```bash
+aws s3 cp s3://qc-dsp-bidreq-logs/bid_requests/dt=2026-02-04/hr=18/part-0001.json.gz - | gunzip
+```
+
+---
+
+## 📊 Architecture Diagram
+
+```
+┌─────────────────────┐
+│ Synthetic Loadgen   │  Generates realistic BidRequest protobufs
+│ (cmd/loadgen)       │  at controlled QPS
+└──────────┬──────────┘
+           │ HTTP POST (protobuf binary)
+           ▼
+┌─────────────────────┐
+│ Go Bidder (Local)   │  Decodes protobuf
+│ /openrtb endpoint   │  Returns 204 (no-bid)
+│                     │  Extracts features
+└──────────┬──────────┘
+           │ Normalized JSON logs
+           ▼
+┌─────────────────────┐
+│ Kinesis Firehose    │  Buffers, compresses, retries
+│                     │  Partitions by dt/hr
+└──────────┬──────────┘
+           │ Batched, gzipped writes
+           ▼
+┌─────────────────────┐
+│ S3 Data Lake        │  Long-term storage
+│ /bid_requests/      │  Queryable via Athena
+│  dt=YYYY-MM-DD/     │  ML training ready
+│   hr=HH/            │
+└─────────────────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ Future Use Cases    │
+│ • ML Training       │
+│ • Simulation        │
+│ • Analytics         │
+│ • Optimization      │
+└─────────────────────┘
+```
+
+---
+
+## 🔮 Future Roadmap
+
+### Phase 1: Current (Testing Pipeline)
+- [x] Synthetic traffic generator
+- [x] Local bidder (no-bid only)
+- [x] Firehose → S3 pipeline
+- [x] Terraform infrastructure
+
+### Phase 2: Production Bidder
+- [ ] Deploy bidder to EC2
+- [ ] Implement bidding logic
+- [ ] Generate BidResponse messages
+- [ ] Add pacing + budget controls
+- [ ] Load balancing (ALB/NLB)
+- [ ] Auto-scaling groups
+
+### Phase 3: Real Exchange Integration
+- [ ] Google Authorized Buyers integration
+- [ ] Real-time bidding
+- [ ] Win/loss notifications
+- [ ] Billing reconciliation
+
+### Phase 4: ML + Optimization
+- [ ] CTR/CVR prediction models
+- [ ] Floor price optimization
+- [ ] Value estimation
+- [ ] Replay-based simulation environment
+
+---
+
+## ✅ Summary
+
+You now have:
+
+* ✅ A **synthetic OpenRTB exchange** that generates realistic traffic
+* ✅ A **Go bidder** that correctly decodes protobuf and logs data
+* ✅ A **Firehose → S3 pipeline** for reliable data ingestion
+* ✅ **Terraform infrastructure** for reproducible deployments
+* ✅ A foundation for **real bidding logic and EC2 deployment**
+
+This system validates your entire logging pipeline end-to-end using synthetic data, preparing you for production deployment.

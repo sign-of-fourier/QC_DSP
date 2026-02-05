@@ -1,0 +1,1 @@
+{"ts":"2026-02-02T02:17:02.514196Z","auction_id":"test-auction-id","seat_id":"test-seat","imp":{"id":"1","fmt":"banner","w":300,"h":250,"floor_cpm":1.23},"device":{"os":"iOS","devicetype":"mobile"},"geo":"US-MA","site":{"domain":"example.com","id":"site-123"},"user":{"id":"user-abc","buyeruid":"buyeruid-xyz"}}

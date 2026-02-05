@@ -34,7 +34,6 @@ type BidRequestLog struct {
 	} `json:"user"`
 }
 
-// Helper to set timestamp to now if not provided
 func NewBidRequestLog() BidRequestLog {
 	return BidRequestLog{
 		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
